@@ -1,6 +1,6 @@
-# PagCONNECT
+# Pag-CONNECT
 
-PagCONNECT is a web-based Pag-IBIG membership management system built using Laravel and MySQL. The project is designed to manage member records, contributions, membership information, and related services through a centralized web application.
+Pag-CONNECT is a web-based Pag-IBIG membership management system built using Laravel and MySQL. The project is designed to manage member records, contributions, membership information, and related services through a centralized web application.
 
 ## Tech Stack
 
