@@ -30,7 +30,7 @@ The project demonstrates the use of:
 | Java 17    | Main Programming Language  |
 | MySQL      | Database                   |
 | JDBC       | Java Database Connectivity |
-| VS Code    | IDE                        |
+| Eclipse/IntelliJ    | IDE                        |
 | GitHub     | Version Control            |
 
 # Required Software Installation
