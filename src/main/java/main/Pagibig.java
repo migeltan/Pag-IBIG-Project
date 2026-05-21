@@ -14,11 +14,11 @@ import java.util.List;
 public class Pagibig {
 
     // DAO instances
-    static MemberDAO        memberDAO     = new MemberDAO();
-    static CompanyDAO       companyDAO    = new CompanyDAO();
-    static CurrentEmpDAO    currentEmpDAO = new CurrentEmpDAO();
-    static HeirsDAO         heirsDAO      = new HeirsDAO();
-    static PrevEmpDAO       prevEmpDAO    = new PrevEmpDAO();
+    static MemberDAO memberDAO = new MemberDAO();
+    static CompanyDAO companyDAO = new CompanyDAO();
+    static CurrentEmpDAO currentEmpDAO = new CurrentEmpDAO();
+    static HeirsDAO heirsDAO = new HeirsDAO();
+    static PrevEmpDAO prevEmpDAO = new PrevEmpDAO();
 
     public static void main(String[] args) {
 
