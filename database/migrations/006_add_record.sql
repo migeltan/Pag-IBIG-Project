@@ -21,14 +21,15 @@ INSERT INTO currentemprecordtable
   (PagIbig_MID_No, Company_Code, Occupation, Employment_Status, TypeOfWork,
    Country_Of_Assignment, Date_Employed)
 VALUES 
-  ('1212-3434-5694', 'SPL', 'Database Administrator', 'PERMANENT/REGULAR', NULL,
-   'Philippines', '2025-04-15');
+  ('1212-3434-5694', 'PUP', 'Professor I', 'PERMANENT/REGULAR', NULL,
+   'Philippines', '2024-06-01');
    
 #-- ADDING PREVIOUS EMPLOYMENT
 INSERT INTO prevemptable 
   (PagIbig_MID_No, Company_Code, To_Date, From_Date)
 VALUES 
-  ('1212-3434-5694', 'ORACLE', '2025-03-31', '2020-09-01');
+  ('1212-3434-5694', 'AWS', '2020-10-27', '2023-08-03');
+
   
 #-- ADDING HEIRS:
 INSERT INTO heirstable 
