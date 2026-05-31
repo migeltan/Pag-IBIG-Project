@@ -21,15 +21,21 @@ INSERT INTO currentemprecordtable
   (PagIbig_MID_No, Company_Code, Occupation, Employment_Status, TypeOfWork,
    Country_Of_Assignment, Date_Employed)
 VALUES 
-  ('1212-3434-5672', 'SPL', 'Systems Analyst', 'PERMANENT/REGULAR', NULL,
+  ('1212-3434-5672', 'ORC', 'Systems Analyst', 'PERMANENT/REGULAR', NULL,
    'Philippines', '2025-02-01');
    
 #-- ADDING PREVIOUS EMPLOYMENT
 INSERT INTO prevemptable 
   (PagIbig_MID_No, Company_Code, To_Date, From_Date)
 VALUES 
-  ('1212-3434-5672', 'ORACLE', '2024-10-27', '2022-08-03');
+  ('1212-3434-5672', 'ORC', '2024-10-27', '2022-08-03');
   
+ 
+ #-- FIX HEIRS TABLE TO ALLOW MULTIPLE HEIRS PER MEMBER:
+ALTER TABLE heirstable DROP INDEX PagIbig_MID_No_UNIQUE;
+
+
+
 #-- ADDING HEIRS:
 INSERT INTO heirstable 
   (PagIbig_MID_No, Heirs_Name, Heirs_Relationship, Heirs_Birthdate)

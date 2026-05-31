@@ -1,10 +1,8 @@
-#-- ADDING NEW COMPANY (OFW Employer):
-INSERT INTO companydetailstable 
+INSERT IGNORE INTO companydetailstable 
   (Company_Code, Company_Name, Company_Address, Office_Assignment, Branch_Location)
 VALUES 
   ('SKEC', 'Samsung C&T Engineering', 'Riyadh, Saudi Arabia', 'BRANCH', 'Al Olaya District, Riyadh');
 
-#-- ADDING MEMBER:
 INSERT INTO membertable 
   (PagIbig_MID_No, Occupational_Status, Membership_Type, Membership_Category,
    Member_Name, Father_Name, Mother_Name, Spouse_Name, Birthdate, Marital_Status,
@@ -21,7 +19,6 @@ VALUES
    'Permanent Home Address', NULL, '0920-000-0003', NULL,
    NULL, NULL, 'ramon.santos@gmail.com', 60000.00, NULL, 60000.00);
 
-#-- ADDING CURRENT EMPLOYMENT:
 INSERT INTO currentemprecordtable 
   (PagIbig_MID_No, Company_Code, Occupation, Employment_Status, TypeOfWork,
    Country_Of_Assignment, Date_Employed)
@@ -29,13 +26,11 @@ VALUES
   ('1212-3434-5676', 'SKEC', 'Mechanical Engineer', 'CONTRACTUAL', 'LAND-BASED',
    'Saudi Arabia', '2023-05-01');
 
-#-- ADDING PREVIOUS EMPLOYMENT:
 INSERT INTO prevemptable 
   (PagIbig_MID_No, Company_Code, To_Date, From_Date)
 VALUES 
   ('1212-3434-5676', 'SCPH', '2023-04-30', '2019-08-01');
 
-#-- ADDING HEIRS:
 INSERT INTO heirstable 
   (PagIbig_MID_No, Heirs_Name, Heirs_Relationship, Heirs_Birthdate)
 VALUES 
