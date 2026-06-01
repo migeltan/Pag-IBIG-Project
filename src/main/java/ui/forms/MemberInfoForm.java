@@ -41,6 +41,11 @@ public class MemberInfoForm extends JFrame {
     private JPanel membershipTypeOthersPanel;
     private JPanel membershipCategoryOthersPanel;
 
+    // ADDED: Flag to track whether a DB record already exists for this MID.
+    // Used to decide between INSERT (first save) and UPDATE (subsequent saves),
+    // and to skip the "unsaved changes" warning on Back when data is already stored.
+    private boolean recordExists = false; // ADDED
+
     public MemberInfoForm() {
 
         setTitle("Pag-CONNECT — Member Information");
@@ -111,18 +116,23 @@ public class MemberInfoForm extends JFrame {
         JButton backBtn   = buildButton("Back",  accentRed);
         JButton submitBtn = buildButton("Save",  accentGreen);
 
-        backBtn.addActionListener(e -> {
-            int choice = JOptionPane.showConfirmDialog(
-                    this,
-                    "Are you sure you want to go back?\nUnsaved changes will be lost.",
-                    "Return to Sign Up",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.WARNING_MESSAGE
-            );
-            if (choice == JOptionPane.YES_OPTION) {
-                dispose();
-                SwingUtilities.invokeLater(() -> new SignUpFrame());
-            }
+        backBtn.addActionListener(e -> { // CHANGED: listener body replaced — now branches on recordExists
+            if (recordExists) { // ADDED: skip confirmation if record is already saved
+                dispose(); // ADDED: go back immediately, no data loss risk
+                SwingUtilities.invokeLater(() -> new SignUpFrame()); // ADDED
+            } else { // ADDED: only show warning when no record has been saved yet
+                int choice = JOptionPane.showConfirmDialog(
+                        this,
+                        "Are you sure you want to go back?\nUnsaved changes will be lost.",
+                        "Return to Sign Up",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE
+                );
+                if (choice == JOptionPane.YES_OPTION) {
+                    dispose();
+                    SwingUtilities.invokeLater(() -> new SignUpFrame());
+                }
+            } // ADDED: end of recordExists else-branch
         });
 
         submitBtn.addActionListener(e -> handleSave());
@@ -139,10 +149,162 @@ public class MemberInfoForm extends JFrame {
         card.add(bottom,  BorderLayout.SOUTH);
         bg.add(card);
 
+        prefillFromDb(); // ADDED: populate fields from DB/session before showing the form
+
         setVisible(true);
     }
 
-    // ── Handle Save ───────────────────────────────────────────────────────────
+    // ── ADDED: prefillFromDb() ────────────────────────────────────────────────
+    // Queries the DB for an existing record matching the session MID.
+    // Falls back to the session cache if the DB returns null.
+    // Sets recordExists = true and populates all fields/combos when found.
+    private void prefillFromDb() { // ADDED
+        String mid = RegistrationSession.getInstance().getTempMID(); // ADDED
+        if (mid == null || mid.isEmpty()) return; // ADDED: skip if no MID in session
+
+        MemberDAO dao = new MemberDAO(); // ADDED
+        MemberTable existing = dao.getMemberById(mid); // ADDED: query DB for existing record
+
+        if (existing == null) { // ADDED: DB had no record — try session cache
+            existing = RegistrationSession.getInstance().getMemberData(); // ADDED: fall back to cached data
+        } // ADDED
+
+        if (existing == null) return; // ADDED: nothing found anywhere — leave form blank
+
+        recordExists = true; // ADDED: mark so handleSave() calls UPDATE, not INSERT
+
+        // ADDED: Populate all text fields with stored values (null-safe via setText())
+        setText(memberNameField,           existing.getMemberName()); // ADDED
+        setText(fatherNameField,           existing.getFatherName()); // ADDED
+        setText(motherNameField,           existing.getMotherName()); // ADDED
+        setText(spouseNameField,           existing.getSpouseName()); // ADDED
+        setText(birthdateField,            existing.getBirthdate() != null // ADDED
+                                               ? existing.getBirthdate().toString() : ""); // ADDED
+        setText(birthplaceField,           existing.getBirthplace()); // ADDED
+        setText(crnField,                  existing.getCrn()); // ADDED
+        setText(tinField,                  existing.getTin()); // ADDED
+        setText(sssField,                  existing.getSss()); // ADDED
+        setText(employeeNumberField,       existing.getEmployeeNumber() != null // ADDED
+                                               ? String.valueOf(existing.getEmployeeNumber()) : ""); // ADDED
+        setText(presentHomeAddressField,   existing.getPresentHomeAddress()); // ADDED
+        setText(permanentHomeAddressField, existing.getPermanentHomeAddress()); // ADDED
+        setText(homeTelNumField,           existing.getHomeTelNum()); // ADDED
+        setText(cellphoneNumField,         existing.getCellphoneNum()); // ADDED
+        setText(busDirectLineField,        existing.getBusDirectLine()); // ADDED
+        setText(busTrunkLineField,         existing.getBusTrunkLine()); // ADDED
+        setText(localField,                existing.getLocal()); // ADDED
+        setText(emailAddressField,         existing.getEmailAddress()); // ADDED
+        setText(allowBasicField,           existing.getAllowBasic() != null // ADDED
+                                               ? existing.getAllowBasic().toPlainString() : ""); // ADDED
+        setText(allowOtherSourcesField,    existing.getAllowOtherSources() != null // ADDED
+                                               ? existing.getAllowOtherSources().toPlainString() : ""); // ADDED
+        setText(totalMoIncomeField,        existing.getTotalMoIncome() != null // ADDED
+                                               ? existing.getTotalMoIncome().toPlainString() : ""); // ADDED
+
+        // ADDED: Restore combo selections using reverse-mapper methods (DB enum → UI display value)
+        setCombo(occupationalStatusBox,           fromDbOccupational(existing.getOccupationalStatus())); // ADDED
+        setCombo(membershipTypeBox,               fromDbMembershipType(existing.getMembershipType())); // ADDED
+        setCombo(membershipCategoryBox,           fromDbMembershipCategory(existing.getMembershipCategory())); // ADDED
+        setCombo(maritalStatusBox,                fromDbMarital(existing.getMaritalStatus())); // ADDED
+        setCombo(sexBox,                          toTitleCase(existing.getSex())); // ADDED
+        setCombo(citizenshipBox,                  existing.getCitizenship() != null // ADDED
+                                                      ? existing.getCitizenship() : "Select"); // ADDED
+        setCombo(frequencyOfMembershipSavingsBox, existing.getFrequencyOfMembershipSavings()); // ADDED
+        setCombo(preferredMailingAddressBox,      existing.getPreferredMailingAddress()); // ADDED
+
+        // ADDED: Reveal "Others" specify panels and fill their fields if applicable
+        if ("Others".equals(membershipTypeBox.getSelectedItem())) { // ADDED
+            setText(membershipTypeOthersField, existing.getMembershipTypeOthers()); // ADDED
+            membershipTypeOthersPanel.setVisible(true); // ADDED
+        } // ADDED
+        if ("Others".equals(membershipCategoryBox.getSelectedItem())) { // ADDED
+            setText(membershipCategoryOthersField, existing.getMembershipCategoryOthers()); // ADDED
+            membershipCategoryOthersPanel.setVisible(true); // ADDED
+        } // ADDED
+
+        // ADDED: Sync session so other frames can access member data without another DB hit
+        RegistrationSession session = RegistrationSession.getInstance(); // ADDED
+        session.setMemberData(existing); // ADDED
+        session.setMemberInfoDone(true); // ADDED
+    } // ADDED
+
+    // ── ADDED: setText() — null-safe helper for populating text fields ────────
+    private void setText(JTextField field, String value) { // ADDED
+        if (field != null) field.setText(value != null ? value : ""); // ADDED: guards against null field and null value
+    } // ADDED
+
+    // ── ADDED: setCombo() — selects the matching item in a combo box ──────────
+    // Loops through items and does a case-insensitive match.
+    // Leaves the combo on its current selection if no match is found.
+    private void setCombo(JComboBox<String> box, String value) { // ADDED
+        if (box == null || value == null) return; // ADDED: null guard
+        for (int i = 0; i < box.getItemCount(); i++) { // ADDED
+            if (value.equalsIgnoreCase(box.getItemAt(i))) { // ADDED: case-insensitive match
+                box.setSelectedIndex(i); // ADDED: select matched item
+                return; // ADDED
+            } // ADDED
+        } // ADDED
+        // ADDED: no match found — leave combo as-is ("Select")
+    } // ADDED
+
+    // ── ADDED: Reverse mappers — DB enum strings → UI display values ──────────
+    // These are the inverse of toDbEnum/toMembershipTypeEnum/etc.
+    // Required so prefillFromDb() can restore combo selections from stored values.
+
+    private String fromDbOccupational(String db) { // ADDED
+        if (db == null) return "Select"; // ADDED
+        switch (db) { // ADDED
+            case "EMPLOYED":              return "Employed"; // ADDED
+            case "UNEMPLOYED":            return "Unemployed"; // ADDED
+            case "FIRST TIME JOBSEEKERS": return "First Time Jobseeker"; // ADDED
+            default:                      return "Select"; // ADDED
+        } // ADDED
+    } // ADDED
+
+    private String fromDbMembershipType(String db) { // ADDED
+        if (db == null) return "Select"; // ADDED
+        switch (db) { // ADDED
+            case "EMPLOYED":                 return "Employed"; // ADDED
+            case "OVERSEAS FILIPINO WORKER": return "Overseas Filipino Worker"; // ADDED
+            case "SELF-EMPLOYED":            return "Self-Employed"; // ADDED
+            default:                         return "Others"; // ADDED: unrecognized value maps to "Others"
+        } // ADDED
+    } // ADDED
+
+    private String fromDbMembershipCategory(String db) { // ADDED
+        if (db == null) return "Select"; // ADDED
+        switch (db) { // ADDED
+            case "PRIVATE":                     return "Private"; // ADDED
+            case "GOVERNMENT":                  return "Government"; // ADDED
+            case "PRIVATE HOUSEHOLD":           return "Private Household"; // ADDED
+            case "OVERSEAS FILIPINO WORKER":    return "Overseas Filipino Worker"; // ADDED
+            case "PROFESSIONAL/BUSINESS OWNER": return "Professional/Business Owner"; // ADDED
+            case "JOB ORDER PERSONNEL":         return "Job Order Personnel"; // ADDED
+            case "OTHER EARNING GROUPS":        return "Other Earning Groups"; // ADDED
+            default:                            return "Others"; // ADDED
+        } // ADDED
+    } // ADDED
+
+    private String fromDbMarital(String db) { // ADDED
+        if (db == null) return "Select"; // ADDED
+        switch (db) { // ADDED
+            case "SINGLE":            return "Single"; // ADDED
+            case "MARRIED":           return "Married"; // ADDED
+            case "WIDOWED":           return "Widowed"; // ADDED
+            case "LEGALLY SEPARATED": return "Legally Separated"; // ADDED
+            case "ANNULED":           return "Annulled"; // ADDED: DB has typo "ANNULED"; UI shows correct spelling
+            default:                  return "Select"; // ADDED
+        } // ADDED
+    } // ADDED
+
+    // ── ADDED: toTitleCase() — converts "MALE"/"FEMALE" to "Male"/"Female" ────
+    // Needed so setCombo() can match sex values stored as uppercase in the DB.
+    private String toTitleCase(String s) { // ADDED
+        if (s == null || s.isEmpty()) return "Select"; // ADDED
+        return s.charAt(0) + s.substring(1).toLowerCase(); // ADDED: uppercase first char, lowercase the rest
+    } // ADDED
+
+    // ── CHANGED: handleSave() — now does INSERT or UPDATE based on recordExists ─
     private void handleSave() {
 
         // ── Validate required fields ─────────────────────────────────────────
@@ -187,7 +349,6 @@ public class MemberInfoForm extends JFrame {
                 ? membershipCategoryOthersField.getText().trim()
                 : null;
 
-        // Map combo display values to DB enum values
         String occupationalStatus = toDbEnum((String) occupationalStatusBox.getSelectedItem());
         String membershipTypeDb   = toMembershipTypeEnum(membershipType);
         String membershipCatDb    = toMembershipCategoryEnum(membershipCategory);
@@ -197,8 +358,8 @@ public class MemberInfoForm extends JFrame {
         String frequency          = (String) frequencyOfMembershipSavingsBox.getSelectedItem();
         String mailingAddress     = toMailingEnum((String) preferredMailingAddressBox.getSelectedItem());
 
-        BigDecimal allowBasic = parseBigDecimal(allowBasicField.getText());
-        BigDecimal allowOther = parseBigDecimal(allowOtherSourcesField.getText());
+        BigDecimal allowBasic  = parseBigDecimal(allowBasicField.getText());
+        BigDecimal allowOther  = parseBigDecimal(allowOtherSourcesField.getText());
         BigDecimal totalIncome = allowBasic.add(allowOther);
 
         Integer empNumber = null;
@@ -246,29 +407,38 @@ public class MemberInfoForm extends JFrame {
                 totalIncome
         );
 
-        // ── Save to DB ───────────────────────────────────────────────────────
+        // CHANGED: was always dao.insertMember(); now branches on recordExists
         MemberDAO dao = new MemberDAO();
-        boolean saved = dao.insertMember(member);
+        boolean saved; // CHANGED: was assigned directly from insertMember()
+
+        if (recordExists) { // ADDED: record already in DB — run UPDATE
+            saved = dao.updateMember(member); // ADDED: call updateMember() instead of insertMember()
+        } else { // ADDED: no record yet — run INSERT
+            saved = dao.insertMember(member); // CHANGED: same call as before, but now inside the else-branch
+            if (saved) recordExists = true; // ADDED: flip flag so next Save in same session calls UPDATE
+        } // ADDED
 
         if (!saved) {
             showError("Failed to save. Please check your connection and try again.");
             return;
         }
 
-        // ── Mark session done + store member data ────────────────────────────
+        // ── Sync session ─────────────────────────────────────────────────────
         RegistrationSession session = RegistrationSession.getInstance();
         session.setMemberData(member);
         session.setMemberInfoDone(true);
 
+        // CHANGED: success message now says "updated" vs "saved" based on which operation ran
         JOptionPane.showMessageDialog(this,
-                "Member information saved successfully!",
+                recordExists ? "Member information updated successfully!" // CHANGED: "updated" branch
+                             : "Member information saved successfully!",  // CHANGED: "saved" branch (first insert)
                 "Success", JOptionPane.INFORMATION_MESSAGE);
 
         dispose();
         SwingUtilities.invokeLater(() -> new SignUpFrame());
     }
 
-    // ── Build Form Content ────────────────────────────────────────────────────
+    // ── Build Form Content (unchanged) ───────────────────────────────────────
     private JPanel buildContent() {
 
         JPanel c = new JPanel();
@@ -276,7 +446,6 @@ public class MemberInfoForm extends JFrame {
         c.setLayout(new BoxLayout(c, BoxLayout.Y_AXIS));
         c.setBorder(new EmptyBorder(20, 0, 20, 0));
 
-        // ── Membership Information ────────────────────────────────────────────
         c.add(sectionHeader("Membership Information"));
         c.add(vgap(14));
 
@@ -301,7 +470,6 @@ public class MemberInfoForm extends JFrame {
         c.add(r1);
         c.add(vgap(10));
 
-        // ── Others fields (hidden by default) ───────────────────────────────
         membershipTypeOthersField = tf(100);
         membershipTypeOthersPanel = othersPanel("Membership Type — please specify", membershipTypeOthersField);
         membershipTypeOthersPanel.setVisible(false);
@@ -312,7 +480,6 @@ public class MemberInfoForm extends JFrame {
         membershipCategoryOthersPanel.setVisible(false);
         c.add(membershipCategoryOthersPanel);
 
-        // ── Show/hide Others panels based on combo selection ─────────────────
         membershipTypeBox.addActionListener(e -> {
             boolean show = "Others".equals(membershipTypeBox.getSelectedItem());
             membershipTypeOthersPanel.setVisible(show);
@@ -341,7 +508,6 @@ public class MemberInfoForm extends JFrame {
         c.add(r2);
         c.add(vgap(26));
 
-        // ── Personal Information ──────────────────────────────────────────────
         c.add(sectionHeader("Personal Information"));
         c.add(vgap(14));
 
@@ -381,7 +547,6 @@ public class MemberInfoForm extends JFrame {
         c.add(r7);
         c.add(vgap(26));
 
-        // ── Address Information ───────────────────────────────────────────────
         c.add(sectionHeader("Address Information"));
         c.add(vgap(14));
 
@@ -404,7 +569,6 @@ public class MemberInfoForm extends JFrame {
         c.add(r10);
         c.add(vgap(26));
 
-        // ── Contact Information ───────────────────────────────────────────────
         c.add(sectionHeader("Contact Information"));
         c.add(vgap(14));
 
@@ -422,7 +586,6 @@ public class MemberInfoForm extends JFrame {
         c.add(r12);
         c.add(vgap(26));
 
-        // ── Income Information ────────────────────────────────────────────────
         c.add(sectionHeader("Income Information"));
         c.add(vgap(14));
 
@@ -444,7 +607,7 @@ public class MemberInfoForm extends JFrame {
         return c;
     }
 
-    // ── Others Panel (label + text field, shown when "Others" is selected) ───
+    // ── Others Panel (unchanged) ──────────────────────────────────────────────
     private JPanel othersPanel(String label, JTextField field) {
         JPanel row = row(1);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
@@ -452,7 +615,6 @@ public class MemberInfoForm extends JFrame {
         return row;
     }
 
-    // ── Compute Total Income ──────────────────────────────────────────────────
     private void computeTotalIncome() {
         try {
             double basic = parseDouble(allowBasicField.getText());
@@ -471,35 +633,35 @@ public class MemberInfoForm extends JFrame {
         catch (Exception e) { return BigDecimal.ZERO; }
     }
 
-    // ── DB Enum Mappers ───────────────────────────────────────────────────────
+    // ── DB Enum Mappers UI → DB (unchanged) ──────────────────────────────────
     private String toDbEnum(String occupational) {
         switch (occupational) {
-            case "Employed":            return "EMPLOYED";
-            case "Unemployed":          return "UNEMPLOYED";
+            case "Employed":             return "EMPLOYED";
+            case "Unemployed":           return "UNEMPLOYED";
             case "First Time Jobseeker": return "FIRST TIME JOBSEEKERS";
-            default:                    return occupational.toUpperCase();
+            default:                     return occupational.toUpperCase();
         }
     }
 
     private String toMembershipTypeEnum(String type) {
         switch (type) {
-            case "Employed":                  return "EMPLOYED";
-            case "Overseas Filipino Worker":  return "OVERSEAS FILIPINO WORKER";
-            case "Self-Employed":             return "SELF-EMPLOYED";
-            default:                          return "EMPLOYED";
+            case "Employed":                 return "EMPLOYED";
+            case "Overseas Filipino Worker": return "OVERSEAS FILIPINO WORKER";
+            case "Self-Employed":            return "SELF-EMPLOYED";
+            default:                         return "EMPLOYED";
         }
     }
 
     private String toMembershipCategoryEnum(String cat) {
         switch (cat) {
-            case "Private":                    return "PRIVATE";
-            case "Government":                 return "GOVERNMENT";
-            case "Private Household":          return "PRIVATE HOUSEHOLD";
-            case "Overseas Filipino Worker":   return "OVERSEAS FILIPINO WORKER";
-            case "Professional/Business Owner":return "PROFESSIONAL/BUSINESS OWNER";
-            case "Job Order Personnel":        return "JOB ORDER PERSONNEL";
-            case "Other Earning Groups":       return "OTHER EARNING GROUPS";
-            default:                           return "PRIVATE";
+            case "Private":                     return "PRIVATE";
+            case "Government":                  return "GOVERNMENT";
+            case "Private Household":           return "PRIVATE HOUSEHOLD";
+            case "Overseas Filipino Worker":    return "OVERSEAS FILIPINO WORKER";
+            case "Professional/Business Owner": return "PROFESSIONAL/BUSINESS OWNER";
+            case "Job Order Personnel":         return "JOB ORDER PERSONNEL";
+            case "Other Earning Groups":        return "OTHER EARNING GROUPS";
+            default:                            return "PRIVATE";
         }
     }
 
@@ -516,21 +678,21 @@ public class MemberInfoForm extends JFrame {
 
     private String toMailingEnum(String mailing) {
         switch (mailing) {
-            case "Present Home Address":    return "Present Home Address";
-            case "Permanent Home Address":  return "Permanent Home Address";
+            case "Present Home Address":      return "Present Home Address";
+            case "Permanent Home Address":    return "Permanent Home Address";
             case "Employer/Business Address": return "Employer/Business Address";
-            default:                        return "Present Home Address";
+            default:                          return "Present Home Address";
         }
     }
 
-    // ── Validation Helpers ────────────────────────────────────────────────────
-    private boolean isBlank(JTextField f)      { return f.getText().trim().isEmpty(); }
+    // ── Validation Helpers (unchanged) ───────────────────────────────────────
+    private boolean isBlank(JTextField f)          { return f.getText().trim().isEmpty(); }
     private boolean isComboDefault(JComboBox<?> b) { return "Select".equals(b.getSelectedItem()); }
     private void showError(String msg) {
         JOptionPane.showMessageDialog(this, msg, "Validation Error", JOptionPane.WARNING_MESSAGE);
     }
 
-    // ── Section Header ────────────────────────────────────────────────────────
+    // ── Section Header (unchanged) ────────────────────────────────────────────
     private JPanel sectionHeader(String text) {
         JPanel p = new JPanel(new BorderLayout());
         p.setOpaque(false);

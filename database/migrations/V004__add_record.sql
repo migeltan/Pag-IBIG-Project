@@ -1,8 +1,8 @@
 #-- SQL RECORD ADDING SYNTAX:
 
- INSERT INTO companydetailstable 
+INSERT IGNORE INTO companydetailstable
   (Company_Code, Company_Name, Company_Address, Office_Assignment, Branch_Location)
-VALUES 
+VALUES
   ('HWI', 'Huawei Philippines', 'Taguig City, PH', 'BRANCH', 'Quezon City');
    
 #-- ADDING MEMBER:
@@ -35,7 +35,7 @@ INSERT INTO prevemptable
 VALUES 
   ('1212-3434-5674', 'HWI' , '1999-10-12', '2007-10-12');
   
-  ALTER TABLE heirstable DROP INDEX PagIbig_MID_No_UNIQUE;
+--  ALTER TABLE heirstable DROP INDEX PagIbig_MID_No_UNIQUE;
   
 #-- ADDING HEIRS:
 INSERT INTO heirstable 

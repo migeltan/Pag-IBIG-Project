@@ -34,7 +34,7 @@ public class CurrentEmpDAO {
     }
 
     // ─── READ ─────────────────────────────────────────────────────────────────
-    public CurrentEmpRecordTable getByMID(String pagIbigMIDNo) {
+    public CurrentEmpRecordTable getCurrentEmpByMID(String pagIbigMIDNo) {
         String sql = "SELECT * FROM currentemprecordtable WHERE PagIbig_MID_No = ?";
 
         try (Connection conn = DatabaseConnection.getConnection();
