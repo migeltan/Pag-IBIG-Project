@@ -15,7 +15,7 @@ VALUES
   ('SKEC',   'Samsung C&T Engineering',          'Riyadh, Saudi Arabia',   'BRANCH',      'Al Olaya District, Riyadh'),
   ('SCPH',   'Sta. Clara International Corporation', 'Muntinlupa City, PH','HEAD OFFICE',  NULL),
   ('AECO',   'AECOM Philippines',                'Pasig City, PH',         'BRANCH',      'Ortigas Center, Pasig City'),
-  ('ORACLE', 'Oracle Philippines',               'Taguig City, PH',        'HEAD OFFICE',  NULL);
+  ('ORC', 'Oracle Philippines',               'Taguig City, PH',        'HEAD OFFICE',  NULL);
 
 
 -- -------------------------------------------------------------
