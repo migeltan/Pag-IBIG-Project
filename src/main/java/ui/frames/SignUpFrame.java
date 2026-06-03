@@ -259,7 +259,7 @@ public class SignUpFrame extends JFrame {
             JFrame frame = new JFrame("Pag-CONNECT — Heirs Information");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setSize(1100, 750);
-            frame.add(new HeirsForm());
+            frame.add(new HeirsForm(tempMID));
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
             SignUpFrame.this.dispose();
