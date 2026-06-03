@@ -1,5 +1,8 @@
 package ui.frames;
 
+import dao.MemberDAO;
+import models.MemberTable;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
@@ -25,11 +28,32 @@ public class SignInFrame extends JFrame {
     private final Color textWhite    = Color.WHITE;
     private final Color textMuted    = new Color(255, 255, 255, 160);
 
+    // ── Stored MID for the logged-in member ──────────────────────────────────
+    private final String loggedInMID;
+
+    // ── No-arg constructor (backward compat) ─────────────────────────────────
     public SignInFrame() {
+        this(null);
+    }
+
+    // ── Main constructor ─────────────────────────────────────────────────────
+    public SignInFrame(String mid) {
+        this.loggedInMID = mid;
+
         setTitle("Pag-CONNECT Member Portal");
         setSize(1024, 768);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+
+        // ── Fetch member name from DB for the welcome label ──────────────────
+        String memberName = "Member";
+        if (mid != null && !mid.isEmpty()) {
+            MemberDAO memberDAO = new MemberDAO();
+            MemberTable member = memberDAO.getMemberById(mid);
+            if (member != null && member.getMemberName() != null && !member.getMemberName().isEmpty()) {
+                memberName = member.getMemberName();
+            }
+        }
 
         DiagonalGradientPanel bg = new DiagonalGradientPanel(darkBg1, darkBg2);
         bg.setLayout(new BorderLayout());
@@ -58,7 +82,6 @@ public class SignInFrame extends JFrame {
                     JOptionPane.YES_NO_OPTION,
                     JOptionPane.WARNING_MESSAGE
             );
-
             if (choice == JOptionPane.YES_OPTION) {
                 new LoginFrame();
                 dispose();
@@ -72,7 +95,6 @@ public class SignInFrame extends JFrame {
         headerPanel.setOpaque(false);
         headerPanel.setBorder(new EmptyBorder(20, 28, 8, 28));
 
-        // LEFT: badge + welcome + title stacked
         JPanel leftHeader = new JPanel();
         leftHeader.setLayout(new BoxLayout(leftHeader, BoxLayout.Y_AXIS));
         leftHeader.setOpaque(false);
@@ -88,7 +110,8 @@ public class SignInFrame extends JFrame {
         ));
         badge.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel welcomeLabel = new JLabel("Welcome back, Juan dela Cruz!");
+        // ── Welcome label now shows real member name ──────────────────────────
+        JLabel welcomeLabel = new JLabel("Welcome back, " + memberName + "!");
         welcomeLabel.setFont(new Font("Arial Black", Font.BOLD, 22));
         welcomeLabel.setForeground(new Color(168, 208, 255));
         welcomeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -104,7 +127,6 @@ public class SignInFrame extends JFrame {
         leftHeader.add(Box.createRigidArea(new Dimension(0, 4)));
         leftHeader.add(title);
 
-        // RIGHT: Edit button + Settings button, vertically centred
         JButton editBtn = new JButton("✎  Edit your Information");
         editBtn.setFont(new Font("Arial", Font.BOLD, 12));
         editBtn.setForeground(new Color(96, 216, 164));
@@ -129,13 +151,11 @@ public class SignInFrame extends JFrame {
                 editBtn.setOpaque(false);
             }
         });
-        
         editBtn.addActionListener(e -> {
             new MemberRecordForm(SignInFrame.this).setVisible(true);
             SignInFrame.this.setVisible(false);
         });
 
-        // ── SETTINGS BUTTON ─────────────────────────────────────────────────
         JButton settingsBtn = new JButton("⚙  Settings");
         settingsBtn.setFont(new Font("Arial", Font.BOLD, 12));
         settingsBtn.setForeground(new Color(251, 191, 36));
@@ -165,7 +185,6 @@ public class SignInFrame extends JFrame {
             SignInFrame.this.dispose();
         });
 
-        // Row holding both buttons side by side
         JPanel btnRow = new JPanel();
         btnRow.setLayout(new BoxLayout(btnRow, BoxLayout.X_AXIS));
         btnRow.setOpaque(false);
@@ -213,14 +232,14 @@ public class SignInFrame extends JFrame {
         dot.setForeground(accentGreen);
         dot.setFont(new Font("Arial", Font.PLAIN, 10));
 
-        JLabel midLabel = new JLabel("  PAG-IBIG MID NO:  1234-5678-9012 ");
+        // ── Status bar MID now shows the real logged-in MID ──────────────────
+        JLabel midLabel = new JLabel("  PAG-IBIG MID NO:  " + (loggedInMID != null ? loggedInMID : "—") + " ");
         midLabel.setFont(new Font("Arial Black", Font.BOLD, 13));
         midLabel.setForeground(textWhite);
 
         midPanel.add(dot);
         midPanel.add(midLabel);
 
-        // Right: COMPLETE status + full progress bar
         JPanel completePanel = new JPanel();
         completePanel.setLayout(new BoxLayout(completePanel, BoxLayout.Y_AXIS));
         completePanel.setOpaque(false);
@@ -280,16 +299,17 @@ public class SignInFrame extends JFrame {
         Color[] purpleAcc = {new Color(139,92,246,60),  new Color(139,92,246,100),  new Color(139,92,246)};
         Color[] amberAcc  = {new Color(251,191,36,60),  new Color(251,191,36,100),  new Color(251,191,36)};
 
-        DarkModuleCard btnMember     = new DarkModuleCard("MEMBER INFORMATION",               "VIEW", "👤", blueAcc,   memberIcon,     370, 30, 260, 180);
-        DarkModuleCard btnHeirs      = new DarkModuleCard("HEIRS INFORMATION",                "VIEW", "👨‍👩‍👧", tealAcc,   heirsIcon,      380, 30, 200, 150);
-        DarkModuleCard btnCurrentEmp = new DarkModuleCard("CURRENT EMPLOYMENT INFORMATION",   "VIEW", "💼", purpleAcc, currentEmpIcon, 390, 30, 220, 160);
-        DarkModuleCard btnPrevEmp    = new DarkModuleCard("PREVIOUS EMPLOYMENT INFORMATION",  "VIEW", "📋", amberAcc,  prevEmpIcon,    390, 30, 220, 160);
+        DarkModuleCard btnMember     = new DarkModuleCard("MEMBER INFORMATION",              "VIEW", "👤", blueAcc,   memberIcon,     370, 30, 260, 180);
+        DarkModuleCard btnHeirs      = new DarkModuleCard("HEIRS INFORMATION",               "VIEW", "👨‍👩‍👧", tealAcc,   heirsIcon,      380, 30, 200, 150);
+        DarkModuleCard btnCurrentEmp = new DarkModuleCard("CURRENT EMPLOYMENT INFORMATION",  "VIEW", "💼", purpleAcc, currentEmpIcon, 390, 30, 220, 160);
+        DarkModuleCard btnPrevEmp    = new DarkModuleCard("PREVIOUS EMPLOYMENT INFORMATION", "VIEW", "📋", amberAcc,  prevEmpIcon,    390, 30, 220, 160);
 
+        // ── Pass loggedInMID to MemberInfoFormView ───────────────────────────
         btnMember.addActionListener(e -> {
             JFrame memberFrame = new JFrame("Pag-CONNECT — Member Information");
             memberFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             memberFrame.setSize(1100, 750);
-            memberFrame.add(new MemberInfoFormView());
+            memberFrame.add(new MemberInfoFormView(loggedInMID));
             memberFrame.setLocationRelativeTo(null);
             memberFrame.setVisible(true);
             SignInFrame.this.dispose();
@@ -431,8 +451,6 @@ public class SignInFrame extends JFrame {
                     }
                 };
                 imgLbl.setBounds(imgX, imgY, imgW, imgH);
-
-                // ── FIX: stop the label from swallowing click events ─────────
                 imgLbl.setEnabled(false);
                 imgLbl.setFocusable(false);
                 imgLbl.addMouseListener(new MouseAdapter() {
@@ -449,7 +467,6 @@ public class SignInFrame extends JFrame {
                             SwingUtilities.convertMouseEvent(imgLbl, e, DarkModuleCard.this));
                     }
                     @Override public void mouseEntered(MouseEvent e) {
-                        // keep hover state in sync
                         hovered = true;
                         repaint();
                     }
@@ -458,8 +475,6 @@ public class SignInFrame extends JFrame {
                         repaint();
                     }
                 });
-                // ─────────────────────────────────────────────────────────────
-
                 add(imgLbl);
             }
 

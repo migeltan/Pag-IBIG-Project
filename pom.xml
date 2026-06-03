@@ -5,6 +5,7 @@
   <version>0.0.1-SNAPSHOT</version>
 
   <dependencies>
+    <!-- MySQL Connector -->
     <dependency>
       <groupId>mysql</groupId>
       <artifactId>mysql-connector-java</artifactId>

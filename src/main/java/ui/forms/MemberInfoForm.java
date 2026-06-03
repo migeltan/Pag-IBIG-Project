@@ -41,6 +41,8 @@ public class MemberInfoForm extends JFrame {
     private JPanel membershipTypeOthersPanel;
     private JPanel membershipCategoryOthersPanel;
 
+    private boolean recordExists = false;
+
     public MemberInfoForm() {
 
         setTitle("Pag-CONNECT — Member Information");
@@ -112,16 +114,21 @@ public class MemberInfoForm extends JFrame {
         JButton submitBtn = buildButton("Save",  accentGreen);
 
         backBtn.addActionListener(e -> {
-            int choice = JOptionPane.showConfirmDialog(
-                    this,
-                    "Are you sure you want to go back?\nUnsaved changes will be lost.",
-                    "Return to Sign Up",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.WARNING_MESSAGE
-            );
-            if (choice == JOptionPane.YES_OPTION) {
+            if (recordExists) {
                 dispose();
                 SwingUtilities.invokeLater(() -> new SignUpFrame());
+            } else {
+                int choice = JOptionPane.showConfirmDialog(
+                        this,
+                        "Are you sure you want to go back?\nUnsaved changes will be lost.",
+                        "Return to Sign Up",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE
+                );
+                if (choice == JOptionPane.YES_OPTION) {
+                    dispose();
+                    SwingUtilities.invokeLater(() -> new SignUpFrame());
+                }
             }
         });
 
@@ -139,17 +146,167 @@ public class MemberInfoForm extends JFrame {
         card.add(bottom,  BorderLayout.SOUTH);
         bg.add(card);
 
+        prefillFromDb();
+
         setVisible(true);
     }
 
-    // ── Handle Save ───────────────────────────────────────────────────────────
+    // ── prefillFromDb() ───────────────────────────────────────────────────────
+    private void prefillFromDb() {
+        String mid = RegistrationSession.getInstance().getTempMID();
+        if (mid == null || mid.isEmpty()) return;
+
+        MemberDAO dao = new MemberDAO();
+        MemberTable existing = dao.getMemberById(mid);
+
+        if (existing == null) {
+            existing = RegistrationSession.getInstance().getMemberData();
+        }
+
+        if (existing == null) return;
+
+        recordExists = true;
+
+        setText(memberNameField,           existing.getMemberName());
+        setText(fatherNameField,           existing.getFatherName());
+        setText(motherNameField,           existing.getMotherName());
+        setText(spouseNameField,           existing.getSpouseName());
+        setText(birthdateField,            existing.getBirthdate() != null
+                                               ? existing.getBirthdate().toString() : "");
+        setText(birthplaceField,           existing.getBirthplace());
+        setText(crnField,                  existing.getCrn());
+        setText(tinField,                  existing.getTin());
+        setText(sssField,                  existing.getSss());
+        setText(employeeNumberField,       existing.getEmployeeNumber() != null
+                                               ? String.valueOf(existing.getEmployeeNumber()) : "");
+        setText(presentHomeAddressField,   existing.getPresentHomeAddress());
+        setText(permanentHomeAddressField, existing.getPermanentHomeAddress());
+        setText(homeTelNumField,           existing.getHomeTelNum());
+
+        // CHANGED: phone field now stores raw digits only in DB — re-format on load
+        String rawPhone = existing.getCellphoneNum();
+        if (rawPhone != null && !rawPhone.isEmpty()) {
+            String digits = rawPhone.replaceAll("[^0-9]", "");
+            if (digits.length() == 10) {
+                cellphoneNumField.setText("(+63) " + digits.substring(0, 3)
+                        + " " + digits.substring(3, 6)
+                        + " " + digits.substring(6));
+            } else {
+                cellphoneNumField.setText("(+63) ");
+            }
+        }
+
+        setText(busDirectLineField,        existing.getBusDirectLine());
+        setText(busTrunkLineField,         existing.getBusTrunkLine());
+        setText(localField,                existing.getLocal());
+        setText(emailAddressField,         existing.getEmailAddress());
+        setText(allowBasicField,           existing.getAllowBasic() != null
+                                               ? existing.getAllowBasic().toPlainString() : "");
+        setText(allowOtherSourcesField,    existing.getAllowOtherSources() != null
+                                               ? existing.getAllowOtherSources().toPlainString() : "");
+        setText(totalMoIncomeField,        existing.getTotalMoIncome() != null
+                                               ? existing.getTotalMoIncome().toPlainString() : "");
+
+        setCombo(occupationalStatusBox,           fromDbOccupational(existing.getOccupationalStatus()));
+        setCombo(membershipTypeBox,               fromDbMembershipType(existing.getMembershipType()));
+        setCombo(membershipCategoryBox,           fromDbMembershipCategory(existing.getMembershipCategory()));
+        setCombo(maritalStatusBox,                fromDbMarital(existing.getMaritalStatus()));
+        setCombo(sexBox,                          toTitleCase(existing.getSex()));
+        setCombo(citizenshipBox,                  existing.getCitizenship() != null
+                                                      ? existing.getCitizenship() : "Select");
+        setCombo(frequencyOfMembershipSavingsBox, existing.getFrequencyOfMembershipSavings());
+        setCombo(preferredMailingAddressBox,      existing.getPreferredMailingAddress());
+
+        if ("Others".equals(membershipTypeBox.getSelectedItem())) {
+            setText(membershipTypeOthersField, existing.getMembershipTypeOthers());
+            membershipTypeOthersPanel.setVisible(true);
+        }
+        if ("Others".equals(membershipCategoryBox.getSelectedItem())) {
+            setText(membershipCategoryOthersField, existing.getMembershipCategoryOthers());
+            membershipCategoryOthersPanel.setVisible(true);
+        }
+
+        RegistrationSession session = RegistrationSession.getInstance();
+        session.setMemberData(existing);
+        session.setMemberInfoDone(true);
+    }
+
+    // ── setText() — null-safe helper ─────────────────────────────────────────
+    private void setText(JTextField field, String value) {
+        if (field != null) field.setText(value != null ? value : "");
+    }
+
+    // ── setCombo() — case-insensitive combo selector ──────────────────────────
+    private void setCombo(JComboBox<String> box, String value) {
+        if (box == null || value == null) return;
+        for (int i = 0; i < box.getItemCount(); i++) {
+            if (value.equalsIgnoreCase(box.getItemAt(i))) {
+                box.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
+    // ── Reverse mappers — DB enum strings → UI display values ─────────────────
+    private String fromDbOccupational(String db) {
+        if (db == null) return "Select";
+        switch (db) {
+            case "EMPLOYED":              return "Employed";
+            case "UNEMPLOYED":            return "Unemployed";
+            case "FIRST TIME JOBSEEKERS": return "First Time Jobseeker";
+            default:                      return "Select";
+        }
+    }
+
+    private String fromDbMembershipType(String db) {
+        if (db == null) return "Select";
+        switch (db) {
+            case "EMPLOYED":                 return "Employed";
+            case "OVERSEAS FILIPINO WORKER": return "Overseas Filipino Worker";
+            case "SELF-EMPLOYED":            return "Self-Employed";
+            default:                         return "Others";
+        }
+    }
+
+    private String fromDbMembershipCategory(String db) {
+        if (db == null) return "Select";
+        switch (db) {
+            case "PRIVATE":                     return "Private";
+            case "GOVERNMENT":                  return "Government";
+            case "PRIVATE HOUSEHOLD":           return "Private Household";
+            case "OVERSEAS FILIPINO WORKER":    return "Overseas Filipino Worker";
+            case "PROFESSIONAL/BUSINESS OWNER": return "Professional/Business Owner";
+            case "JOB ORDER PERSONNEL":         return "Job Order Personnel";
+            case "OTHER EARNING GROUPS":        return "Other Earning Groups";
+            default:                            return "Others";
+        }
+    }
+
+    private String fromDbMarital(String db) {
+        if (db == null) return "Select";
+        switch (db) {
+            case "SINGLE":            return "Single";
+            case "MARRIED":           return "Married";
+            case "WIDOWED":           return "Widowed";
+            case "LEGALLY SEPARATED": return "Legally Separated";
+            case "ANNULED":           return "Annulled";
+            default:                  return "Select";
+        }
+    }
+
+    private String toTitleCase(String s) {
+        if (s == null || s.isEmpty()) return "Select";
+        return s.charAt(0) + s.substring(1).toLowerCase();
+    }
+
+    // ── handleSave() — INSERT or UPDATE based on recordExists ─────────────────
     private void handleSave() {
 
         // ── Validate required fields ─────────────────────────────────────────
         if (isBlank(memberNameField)
                 || isBlank(birthdateField)
                 || isBlank(birthplaceField)
-                || isBlank(cellphoneNumField)
+                || isBlankPhone(cellphoneNumField)   // CHANGED: use phone-aware blank check
                 || isBlank(presentHomeAddressField)
                 || isBlank(permanentHomeAddressField)
                 || isBlank(allowBasicField)
@@ -187,7 +344,6 @@ public class MemberInfoForm extends JFrame {
                 ? membershipCategoryOthersField.getText().trim()
                 : null;
 
-        // Map combo display values to DB enum values
         String occupationalStatus = toDbEnum((String) occupationalStatusBox.getSelectedItem());
         String membershipTypeDb   = toMembershipTypeEnum(membershipType);
         String membershipCatDb    = toMembershipCategoryEnum(membershipCategory);
@@ -197,8 +353,11 @@ public class MemberInfoForm extends JFrame {
         String frequency          = (String) frequencyOfMembershipSavingsBox.getSelectedItem();
         String mailingAddress     = toMailingEnum((String) preferredMailingAddressBox.getSelectedItem());
 
-        BigDecimal allowBasic = parseBigDecimal(allowBasicField.getText());
-        BigDecimal allowOther = parseBigDecimal(allowOtherSourcesField.getText());
+        // CHANGED: strip formatting from phone field before saving — store only digits
+        String rawPhone = cellphoneNumField.getText().replaceAll("[^0-9]", "");
+
+        BigDecimal allowBasic  = parseBigDecimal(allowBasicField.getText());
+        BigDecimal allowOther  = parseBigDecimal(allowOtherSourcesField.getText());
         BigDecimal totalIncome = allowBasic.add(allowOther);
 
         Integer empNumber = null;
@@ -236,7 +395,7 @@ public class MemberInfoForm extends JFrame {
                 permanentHomeAddressField.getText().trim(),
                 mailingAddress,
                 homeTelNumField.getText().trim(),
-                cellphoneNumField.getText().trim(),
+                rawPhone,   // CHANGED: save raw digits string
                 busDirectLineField.getText().trim(),
                 busTrunkLineField.getText().trim(),
                 localField.getText().trim(),
@@ -246,22 +405,29 @@ public class MemberInfoForm extends JFrame {
                 totalIncome
         );
 
-        // ── Save to DB ───────────────────────────────────────────────────────
         MemberDAO dao = new MemberDAO();
-        boolean saved = dao.insertMember(member);
+        boolean saved;
+
+        if (recordExists) {
+            saved = dao.updateMember(member);
+        } else {
+            saved = dao.insertMember(member);
+            if (saved) recordExists = true;
+        }
 
         if (!saved) {
             showError("Failed to save. Please check your connection and try again.");
             return;
         }
 
-        // ── Mark session done + store member data ────────────────────────────
+        // ── Sync session ─────────────────────────────────────────────────────
         RegistrationSession session = RegistrationSession.getInstance();
         session.setMemberData(member);
         session.setMemberInfoDone(true);
 
         JOptionPane.showMessageDialog(this,
-                "Member information saved successfully!",
+                recordExists ? "Member information updated successfully!"
+                             : "Member information saved successfully!",
                 "Success", JOptionPane.INFORMATION_MESSAGE);
 
         dispose();
@@ -276,7 +442,6 @@ public class MemberInfoForm extends JFrame {
         c.setLayout(new BoxLayout(c, BoxLayout.Y_AXIS));
         c.setBorder(new EmptyBorder(20, 0, 20, 0));
 
-        // ── Membership Information ────────────────────────────────────────────
         c.add(sectionHeader("Membership Information"));
         c.add(vgap(14));
 
@@ -301,7 +466,6 @@ public class MemberInfoForm extends JFrame {
         c.add(r1);
         c.add(vgap(10));
 
-        // ── Others fields (hidden by default) ───────────────────────────────
         membershipTypeOthersField = tf(100);
         membershipTypeOthersPanel = othersPanel("Membership Type — please specify", membershipTypeOthersField);
         membershipTypeOthersPanel.setVisible(false);
@@ -312,7 +476,6 @@ public class MemberInfoForm extends JFrame {
         membershipCategoryOthersPanel.setVisible(false);
         c.add(membershipCategoryOthersPanel);
 
-        // ── Show/hide Others panels based on combo selection ─────────────────
         membershipTypeBox.addActionListener(e -> {
             boolean show = "Others".equals(membershipTypeBox.getSelectedItem());
             membershipTypeOthersPanel.setVisible(show);
@@ -341,7 +504,6 @@ public class MemberInfoForm extends JFrame {
         c.add(r2);
         c.add(vgap(26));
 
-        // ── Personal Information ──────────────────────────────────────────────
         c.add(sectionHeader("Personal Information"));
         c.add(vgap(14));
 
@@ -358,7 +520,8 @@ public class MemberInfoForm extends JFrame {
         c.add(vgap(16));
 
         JPanel r5 = row(3);
-        r5.add(lf("Birthdate (YYYY-MM-DD) *", birthdateField  = tf(10)));
+        // CHANGED: birthdateField now uses tfDate() for restricted date input
+        r5.add(lf("Birthdate (YYYY-MM-DD) *", birthdateField = tfDate()));
         r5.add(lf("Birthplace *",             birthplaceField = tf(45)));
         r5.add(lf("Marital Status *",
                 maritalStatusBox = cb(new String[]{
@@ -377,11 +540,10 @@ public class MemberInfoForm extends JFrame {
         JPanel r7 = row(3);
         r7.add(lf("TIN",           tinField            = tf(14)));
         r7.add(lf("SSS No.",       sssField            = tf(12)));
-        r7.add(lf("Employee No.",  employeeNumberField = tf(14)));
+        r7.add(lf("Employee No.",  employeeNumberField = tfDigitsOnly(14)));  // CHANGED: digits only
         c.add(r7);
         c.add(vgap(26));
 
-        // ── Address Information ───────────────────────────────────────────────
         c.add(sectionHeader("Address Information"));
         c.add(vgap(14));
 
@@ -404,14 +566,14 @@ public class MemberInfoForm extends JFrame {
         c.add(r10);
         c.add(vgap(26));
 
-        // ── Contact Information ───────────────────────────────────────────────
         c.add(sectionHeader("Contact Information"));
         c.add(vgap(14));
 
         JPanel r11 = row(3);
-        r11.add(lf("Cellphone No. * (+63...)", cellphoneNumField = tf(13)));
-        r11.add(lf("Home Telephone No.",       homeTelNumField   = tf(20)));
-        r11.add(lf("Email Address",            emailAddressField = tf(255)));
+        // CHANGED: cellphoneNumField now uses tfPhone() with auto (+63) prefix and formatting
+        r11.add(lf("Cellphone No. *", cellphoneNumField = tfPhone()));
+        r11.add(lf("Home Telephone No.", homeTelNumField = tf(20)));
+        r11.add(lf("Email Address",      emailAddressField = tf(255)));
         c.add(r11);
         c.add(vgap(16));
 
@@ -422,7 +584,6 @@ public class MemberInfoForm extends JFrame {
         c.add(r12);
         c.add(vgap(26));
 
-        // ── Income Information ────────────────────────────────────────────────
         c.add(sectionHeader("Income Information"));
         c.add(vgap(14));
 
@@ -444,7 +605,161 @@ public class MemberInfoForm extends JFrame {
         return c;
     }
 
-    // ── Others Panel (label + text field, shown when "Others" is selected) ───
+    // ── ADDED: tfDate() — restricts input to YYYY-MM-DD format ───────────────
+    // Only allows digits and dashes, max 10 characters.
+    // Auto-inserts dashes after position 4 (YYYY-) and 7 (YYYY-MM-).
+    private JTextField tfDate() {
+        JTextField field = tf(10);
+        field.setToolTipText("Format: YYYY-MM-DD");
+
+        ((javax.swing.text.AbstractDocument) field.getDocument())
+            .setDocumentFilter(new javax.swing.text.DocumentFilter() {
+                @Override
+                public void replace(FilterBypass fb, int offset, int length, String text,
+                                    javax.swing.text.AttributeSet attrs)
+                        throws javax.swing.text.BadLocationException {
+                    if (text == null) text = "";
+
+                    // Build what the full string would look like after this edit
+                    String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                    StringBuilder sb = new StringBuilder(current);
+                    sb.replace(offset, offset + length, text);
+                    String raw = sb.toString();
+
+                    // Strip everything that isn't a digit
+                    String digits = raw.replaceAll("[^0-9]", "");
+                    if (digits.length() > 8) return; // max 8 digits (YYYYMMDD)
+
+                    // Re-format with dashes: YYYY-MM-DD
+                    StringBuilder formatted = new StringBuilder();
+                    for (int i = 0; i < digits.length(); i++) {
+                        if (i == 4 || i == 6) formatted.append("-");
+                        formatted.append(digits.charAt(i));
+                    }
+
+                    // Replace the entire field content with formatted result
+                    fb.replace(0, fb.getDocument().getLength(),
+                            formatted.toString(), attrs);
+                }
+
+                @Override
+                public void remove(FilterBypass fb, int offset, int length)
+                        throws javax.swing.text.BadLocationException {
+                    replace(fb, offset, length, "", null);
+                }
+            });
+
+        return field;
+    }
+
+    // ── ADDED: tfPhone() — auto-prefixes (+63) and formats as (+63) 999 999 9999
+    private JTextField tfPhone() {
+        final String PREFIX = "(+63) ";
+        JTextField field = tf(18); // "(+63) 999 999 9999" = 18 chars total
+        field.setText(PREFIX);
+        field.setToolTipText("Format: (+63) 999 999 9999");
+
+        ((javax.swing.text.AbstractDocument) field.getDocument())
+            .setDocumentFilter(new javax.swing.text.DocumentFilter() {
+                @Override
+                public void replace(FilterBypass fb, int offset, int length, String text,
+                                    javax.swing.text.AttributeSet attrs)
+                        throws javax.swing.text.BadLocationException {
+                    if (text == null) text = "";
+
+                    // Block edits that touch the prefix
+                    if (offset < PREFIX.length()) return;
+
+                    // Get current digits after prefix
+                    String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                    String afterPrefix = current.length() > PREFIX.length()
+                            ? current.substring(PREFIX.length()) : "";
+                    String digits = afterPrefix.replaceAll("[^0-9]", "");
+
+                    // Calculate digit-space offset (accounting for spaces in formatted string)
+                    int digitOffset = 0;
+                    int charPos = PREFIX.length();
+                    while (charPos < offset && digitOffset < digits.length()) {
+                        char ch = afterPrefix.charAt(charPos - PREFIX.length());
+                        if (Character.isDigit(ch)) digitOffset++;
+                        charPos++;
+                    }
+
+                    // Replace digits in the appropriate position
+                    String newDigits = text.replaceAll("[^0-9]", "");
+                    int removeCount = 0;
+                    int scanPos = PREFIX.length();
+                    while (scanPos < offset + length && removeCount < digits.length()) {
+                        if (scanPos >= PREFIX.length()) {
+                            char ch = current.length() > scanPos ? current.charAt(scanPos) : 0;
+                            if (Character.isDigit(ch)) removeCount++;
+                        }
+                        scanPos++;
+                    }
+
+                    StringBuilder sb = new StringBuilder(digits);
+                    int endIdx = Math.min(digitOffset + removeCount, sb.length());
+                    if (digitOffset > sb.length()) return;
+                    sb.replace(digitOffset, endIdx, newDigits);
+
+                    if (sb.length() > 10) return; // max 10 digits after +63
+
+                    // Format: XXX XXX XXXX
+                    String d = sb.toString();
+                    StringBuilder formatted = new StringBuilder(PREFIX);
+                    for (int i = 0; i < d.length(); i++) {
+                        if (i == 3 || i == 6) formatted.append(" ");
+                        formatted.append(d.charAt(i));
+                    }
+
+                    fb.replace(0, fb.getDocument().getLength(),
+                            formatted.toString(), attrs);
+                }
+
+                @Override
+                public void remove(FilterBypass fb, int offset, int length)
+                        throws javax.swing.text.BadLocationException {
+                    // Block removal of the prefix
+                    if (offset < PREFIX.length()) return;
+                    replace(fb, offset, length, "", null);
+                }
+            });
+
+        // Keep caret after prefix if user clicks before it
+        field.addCaretListener(e -> SwingUtilities.invokeLater(() -> {
+            if (field.getCaretPosition() < PREFIX.length())
+                field.setCaretPosition(PREFIX.length());
+        }));
+
+        return field;
+    }
+
+    // ── ADDED: tfDigitsOnly() — restricts field to numeric digits only ─────────
+    private JTextField tfDigitsOnly(int maxLen) {
+        JTextField field = tf(maxLen);
+        ((javax.swing.text.AbstractDocument) field.getDocument())
+            .setDocumentFilter(new javax.swing.text.DocumentFilter() {
+                @Override
+                public void replace(FilterBypass fb, int offset, int length, String text,
+                                    javax.swing.text.AttributeSet attrs)
+                        throws javax.swing.text.BadLocationException {
+                    if (text == null) text = "";
+                    String filtered = text.replaceAll("[^0-9]", "");
+                    int newLen = fb.getDocument().getLength() - length + filtered.length();
+                    if (newLen <= maxLen)
+                        super.replace(fb, offset, length, filtered, attrs);
+                }
+            });
+        return field;
+    }
+
+    // ── ADDED: isBlankPhone() — checks if phone field has a full 10-digit number
+    private boolean isBlankPhone(JTextField f) {
+        String digits = f.getText().replaceAll("[^0-9]", "");
+        return digits.length() < 10;
+    }
+
+    // ── Others Panel ──────────────────────────────────────────────────────────
     private JPanel othersPanel(String label, JTextField field) {
         JPanel row = row(1);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
@@ -452,7 +767,6 @@ public class MemberInfoForm extends JFrame {
         return row;
     }
 
-    // ── Compute Total Income ──────────────────────────────────────────────────
     private void computeTotalIncome() {
         try {
             double basic = parseDouble(allowBasicField.getText());
@@ -471,35 +785,35 @@ public class MemberInfoForm extends JFrame {
         catch (Exception e) { return BigDecimal.ZERO; }
     }
 
-    // ── DB Enum Mappers ───────────────────────────────────────────────────────
+    // ── DB Enum Mappers UI → DB ───────────────────────────────────────────────
     private String toDbEnum(String occupational) {
         switch (occupational) {
-            case "Employed":            return "EMPLOYED";
-            case "Unemployed":          return "UNEMPLOYED";
+            case "Employed":             return "EMPLOYED";
+            case "Unemployed":           return "UNEMPLOYED";
             case "First Time Jobseeker": return "FIRST TIME JOBSEEKERS";
-            default:                    return occupational.toUpperCase();
+            default:                     return occupational.toUpperCase();
         }
     }
 
     private String toMembershipTypeEnum(String type) {
         switch (type) {
-            case "Employed":                  return "EMPLOYED";
-            case "Overseas Filipino Worker":  return "OVERSEAS FILIPINO WORKER";
-            case "Self-Employed":             return "SELF-EMPLOYED";
-            default:                          return "EMPLOYED";
+            case "Employed":                 return "EMPLOYED";
+            case "Overseas Filipino Worker": return "OVERSEAS FILIPINO WORKER";
+            case "Self-Employed":            return "SELF-EMPLOYED";
+            default:                         return "EMPLOYED";
         }
     }
 
     private String toMembershipCategoryEnum(String cat) {
         switch (cat) {
-            case "Private":                    return "PRIVATE";
-            case "Government":                 return "GOVERNMENT";
-            case "Private Household":          return "PRIVATE HOUSEHOLD";
-            case "Overseas Filipino Worker":   return "OVERSEAS FILIPINO WORKER";
-            case "Professional/Business Owner":return "PROFESSIONAL/BUSINESS OWNER";
-            case "Job Order Personnel":        return "JOB ORDER PERSONNEL";
-            case "Other Earning Groups":       return "OTHER EARNING GROUPS";
-            default:                           return "PRIVATE";
+            case "Private":                     return "PRIVATE";
+            case "Government":                  return "GOVERNMENT";
+            case "Private Household":           return "PRIVATE HOUSEHOLD";
+            case "Overseas Filipino Worker":    return "OVERSEAS FILIPINO WORKER";
+            case "Professional/Business Owner": return "PROFESSIONAL/BUSINESS OWNER";
+            case "Job Order Personnel":         return "JOB ORDER PERSONNEL";
+            case "Other Earning Groups":        return "OTHER EARNING GROUPS";
+            default:                            return "PRIVATE";
         }
     }
 
@@ -509,22 +823,22 @@ public class MemberInfoForm extends JFrame {
             case "Married":           return "MARRIED";
             case "Widowed":           return "WIDOWED";
             case "Legally Separated": return "LEGALLY SEPARATED";
-            case "Annulled":          return "ANNULED";   // matches DB spelling
+            case "Annulled":          return "ANNULED";
             default:                  return "SINGLE";
         }
     }
 
     private String toMailingEnum(String mailing) {
         switch (mailing) {
-            case "Present Home Address":    return "Present Home Address";
-            case "Permanent Home Address":  return "Permanent Home Address";
+            case "Present Home Address":      return "Present Home Address";
+            case "Permanent Home Address":    return "Permanent Home Address";
             case "Employer/Business Address": return "Employer/Business Address";
-            default:                        return "Present Home Address";
+            default:                          return "Present Home Address";
         }
     }
 
     // ── Validation Helpers ────────────────────────────────────────────────────
-    private boolean isBlank(JTextField f)      { return f.getText().trim().isEmpty(); }
+    private boolean isBlank(JTextField f)          { return f.getText().trim().isEmpty(); }
     private boolean isComboDefault(JComboBox<?> b) { return "Select".equals(b.getSelectedItem()); }
     private void showError(String msg) {
         JOptionPane.showMessageDialog(this, msg, "Validation Error", JOptionPane.WARNING_MESSAGE);
