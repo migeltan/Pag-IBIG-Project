@@ -1,9 +1,12 @@
 package ui.forms;
 
+import dao.HeirsDAO;
+import models.HeirsTable;
 import ui.frames.SignUpFrame;
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
+import java.sql.Date;
 import java.util.ArrayList;
 import java.util.List;
 public class HeirsForm extends JPanel {
@@ -20,8 +23,15 @@ public class HeirsForm extends JPanel {
    private JPanel listPanel;
    private int    heirCount = 0;
    public  List<HeirEntry> entries = new ArrayList<>();
+
+   // ── Logged-in member's MID (injected from session) ───────────────────────
+   private final String loggedInMid;
+   // ── Tracks whether data was successfully saved ───────────────────────────
+   private boolean isSaved = false;
+
    // ────────────────────────────────────────────────────────────────────────
-   public HeirsForm() {
+   public HeirsForm(String loggedInMid) {
+       this.loggedInMid = (loggedInMid != null) ? loggedInMid : "";
        setLayout(new BorderLayout());
        // ── Gradient background ───────────────────────────────────────────────
        JPanel bg = new JPanel(new BorderLayout()) {
@@ -98,6 +108,13 @@ public class HeirsForm extends JPanel {
        JButton continueBtn = buildButton("Save", accentGreen);
        
        returnBtn.addActionListener(e -> {
+           if (isSaved) {
+               // Already saved — go back directly, no confirmation needed
+               Window currentWindow = SwingUtilities.getWindowAncestor(HeirsForm.this);
+               if (currentWindow != null) currentWindow.dispose();
+               SwingUtilities.invokeLater(() -> new SignUpFrame().setVisible(true));
+               return;
+           }
     	    int choice = JOptionPane.showConfirmDialog(
     	            HeirsForm.this,
     	            "Are you sure you want to go back?\nUnsaved changes will be lost.",
@@ -105,7 +122,6 @@ public class HeirsForm extends JPanel {
     	            JOptionPane.YES_NO_OPTION,
     	            JOptionPane.WARNING_MESSAGE
     	    );
-
     	    if (choice == JOptionPane.YES_OPTION) {
     	        Window currentWindow = SwingUtilities.getWindowAncestor(HeirsForm.this);
     	        if (currentWindow != null) currentWindow.dispose();
@@ -113,10 +129,56 @@ public class HeirsForm extends JPanel {
     	    }
     	});
 
-       continueBtn.addActionListener(e ->
-               JOptionPane.showMessageDialog(this,
-                       "Member information submitted successfully!",
-                       "Success", JOptionPane.INFORMATION_MESSAGE));
+       continueBtn.addActionListener(e -> {
+           // ── Validate all entries ──────────────────────────────────────────
+           for (int i = 0; i < entries.size(); i++) {
+               HeirEntry en = entries.get(i);
+               String name  = en.heirsNameField.getText().trim();
+               String rel   = (String) en.heirsRelationshipBox.getSelectedItem();
+               String bdate = en.heirsBirthdateField.getText().trim();
+
+               if (name.isEmpty()) {
+                   JOptionPane.showMessageDialog(this,
+                       "Heir " + (i + 1) + ": Please enter the heir's name.",
+                       "Missing Field", JOptionPane.WARNING_MESSAGE);
+                   return;
+               }
+               if ("Select".equals(rel)) {
+                   JOptionPane.showMessageDialog(this,
+                       "Heir " + (i + 1) + ": Please select a relationship.",
+                       "Missing Field", JOptionPane.WARNING_MESSAGE);
+                   return;
+               }
+               if (!bdate.matches("\\d{4}-\\d{2}-\\d{2}")) {
+                   JOptionPane.showMessageDialog(this,
+                       "Heir " + (i + 1) + ": Birthdate must be in YYYY-MM-DD format.",
+                       "Invalid Date", JOptionPane.WARNING_MESSAGE);
+                   return;
+               }
+           }
+           // ── Save each entry to the database ───────────────────────────────
+           HeirsDAO dao = new HeirsDAO();
+           int saved = 0;
+           for (HeirEntry en : entries) {
+               try {
+                   HeirsTable heir = new HeirsTable();
+                   heir.setPagIbigMIDNo(loggedInMid);
+                   heir.setHeirsName(en.heirsNameField.getText().trim());
+                   heir.setHeirsRelationship((String) en.heirsRelationshipBox.getSelectedItem());
+                   heir.setHeirsBirthdate(Date.valueOf(en.heirsBirthdateField.getText().trim()));
+                   if (dao.insertHeir(heir)) saved++;
+               } catch (Exception ex) {
+                   JOptionPane.showMessageDialog(this,
+                       "Error saving heir: " + ex.getMessage(),
+                       "Database Error", JOptionPane.ERROR_MESSAGE);
+                   return;
+               }
+           }
+           JOptionPane.showMessageDialog(this,
+               saved + " heir(s) saved successfully!",
+               "Heirs Saved", JOptionPane.INFORMATION_MESSAGE);
+           isSaved = true;
+       });
        bottomBar.add(returnBtn);
        bottomBar.add(continueBtn);
        card.add(bottomBar, BorderLayout.SOUTH);
@@ -128,12 +190,50 @@ public class HeirsForm extends JPanel {
        cardWrap.add(card, BorderLayout.CENTER);
        bg.add(cardWrap, BorderLayout.CENTER);
        add(bg, BorderLayout.CENTER);
-       addEntry();
+       loadFromDatabase();
+   }
+
+   // ── Load previously saved heirs from DB, or start blank ──────────────────
+   private void loadFromDatabase() {
+       HeirsDAO dao = new HeirsDAO();
+       List<HeirsTable> saved = dao.getHeirsByMID(loggedInMid);
+
+       if (saved.isEmpty()) {
+           addEntry(); // fresh start — one blank entry
+       } else {
+           for (HeirsTable heir : saved) {
+               heirCount++;
+               HeirEntry entry = new HeirEntry(heirCount, this);
+               entry.pagIbigMidNoField.setText(loggedInMid);
+               entry.pagIbigMidNoField.setEditable(false);
+               entry.pagIbigMidNoField.setFocusable(false);
+               entry.pagIbigMidNoField.setBackground(new Color(10, 20, 42));
+               entry.pagIbigMidNoField.setForeground(new Color(251, 191, 36));
+               entry.heirsNameField.setText(heir.getHeirsName());
+               entry.heirsRelationshipBox.setSelectedItem(heir.getHeirsRelationship());
+               entry.heirsBirthdateField.setText(
+                   heir.getHeirsBirthdate() != null ? heir.getHeirsBirthdate().toString() : "");
+               entries.add(entry);
+               listPanel.add(entry);
+               listPanel.add(Box.createVerticalStrut(8));
+           }
+           listPanel.revalidate();
+           listPanel.repaint();
+           isSaved = true; // treat pre-loaded data as already saved
+       }
    }
    // ── Add Entry ─────────────────────────────────────────────────────────────
    public void addEntry() {
        heirCount++;
        HeirEntry entry = new HeirEntry(heirCount, this);
+
+       // Auto-fill MID from the logged-in session and lock it
+       entry.pagIbigMidNoField.setText(loggedInMid);
+       entry.pagIbigMidNoField.setEditable(false);
+       entry.pagIbigMidNoField.setFocusable(false);
+       entry.pagIbigMidNoField.setBackground(new Color(10, 20, 42));
+       entry.pagIbigMidNoField.setForeground(new Color(251, 191, 36));
+
        entries.add(entry);
        listPanel.add(entry);
        listPanel.add(Box.createVerticalStrut(8));
@@ -220,7 +320,7 @@ public class HeirsForm extends JPanel {
            // ── Fields ───────────────────────────────────────────────────────
            pagIbigMidNoField    = buildTextField();
            heirsNameField       = buildTextField();
-           heirsBirthdateField  = buildTextField();
+           heirsBirthdateField  = buildDateField();
            heirsRelationshipBox = buildComboBox(new String[]{
                "Select", "Spouse", "Child", "Parent", "Sibling", "Other"
            });
@@ -229,7 +329,7 @@ public class HeirsForm extends JPanel {
            row1.add(fieldPanel("HEIR'S NAME",      heirsNameField));
            JPanel row2 = buildRow();
            row2.add(fieldPanel("RELATIONSHIP",     heirsRelationshipBox));
-           row2.add(fieldPanel("BIRTHDATE",        heirsBirthdateField));
+           row2.add(fieldPanel("BIRTHDATE (YYYY-MM-DD)", heirsBirthdateField));
            JPanel fields = new JPanel();
            fields.setOpaque(false);
            fields.setLayout(new BoxLayout(fields, BoxLayout.Y_AXIS));
@@ -276,6 +376,50 @@ public class HeirsForm extends JPanel {
            new EmptyBorder(8, 12, 8, 12)));
        return f;
    }
+   // ── Date field: auto-inserts dashes, max 10 chars (YYYY-MM-DD) ───────────
+   private JTextField buildDateField() {
+       JTextField f = new JTextField();
+       f.setForeground(Color.WHITE);
+       f.setCaretColor(Color.WHITE);
+       f.setBackground(fieldBg);
+       f.setFont(new Font("Arial", Font.PLAIN, 13));
+       f.setBorder(new CompoundBorder(
+           new LineBorder(new Color(255, 255, 255, 40), 1, true),
+           new EmptyBorder(8, 12, 8, 12)));
+       f.addKeyListener(new java.awt.event.KeyAdapter() {
+           @Override
+           public void keyTyped(java.awt.event.KeyEvent e) {
+               char c = e.getKeyChar();
+               // Only allow digits; block everything else
+               if (!Character.isDigit(c)) {
+                   e.consume();
+                   return;
+               }
+               // Strip existing dashes to count raw digits
+               String digits = f.getText().replaceAll("-", "");
+               if (digits.length() >= 8) {
+                   e.consume(); // max 8 digits reached
+                   return;
+               }
+               // Allow the digit, then auto-append dash if needed
+               SwingUtilities.invokeLater(() -> {
+                   String raw = f.getText().replaceAll("[^0-9]", "");
+                   if (raw.length() > 8) raw = raw.substring(0, 8);
+                   StringBuilder sb = new StringBuilder();
+                   for (int i = 0; i < raw.length(); i++) {
+                       if (i == 4 || i == 6) sb.append('-');
+                       sb.append(raw.charAt(i));
+                   }
+                   String formatted = sb.toString();
+                   if (!formatted.equals(f.getText())) {
+                       f.setText(formatted);
+                       f.setCaretPosition(formatted.length());
+                   }
+               });
+           }
+       });
+       return f;
+   }
    private JComboBox<String> buildComboBox(String[] items) {
        JComboBox<String> box = new JComboBox<>(items);
        box.setFont(new Font("Arial", Font.PLAIN, 13));
@@ -311,9 +455,8 @@ public class HeirsForm extends JPanel {
            f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
            f.setSize(1200, 750);
            f.setLocationRelativeTo(null);
-           f.setContentPane(new HeirsForm());
+           f.setContentPane(new HeirsForm("0000-0000-0000"));
            f.setVisible(true);
        });
    }
 }
-
