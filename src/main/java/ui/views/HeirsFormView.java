@@ -1,5 +1,7 @@
 package ui.views;
 
+import dao.HeirsDAO;
+import models.HeirsTable;
 import ui.frames.SignInFrame;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -20,7 +22,11 @@ public class HeirsFormView extends JPanel {
     private int heirCount = 0;
     public List<HeirEntry> entries = new ArrayList<>();
 
-    public HeirsFormView() {
+    // ── Logged-in member's MID (set from session) ────────────────────────────
+    private final String loggedInMid;
+
+    public HeirsFormView(String loggedInMid) {
+        this.loggedInMid = (loggedInMid != null) ? loggedInMid : "";
 
         setLayout(new BorderLayout());
 
@@ -120,17 +126,46 @@ public class HeirsFormView extends JPanel {
         bg.add(card);
         add(bg, BorderLayout.CENTER);
 
-        // ── Dummy Entries ────────────────────────────────────────────────────
-        addEntry();
-        addEntry();
-        loadDummyData();
+        // ── Load real heirs from DB ──────────────────────────────────────────
+        loadFromDatabase();
     }
 
-    // ── Add Entry ────────────────────────────────────────────────────────────
+    // ── Load heirs from DB for this MID ──────────────────────────────────────
+    private void loadFromDatabase() {
+        HeirsDAO dao = new HeirsDAO();
+        List<HeirsTable> saved = dao.getHeirsByMID(loggedInMid);
+
+        if (saved.isEmpty()) {
+            // No saved heirs yet — start with one blank entry
+            addEntry();
+        } else {
+            for (HeirsTable heir : saved) {
+                heirCount++;
+                HeirEntry entry = new HeirEntry(heirCount, this);
+                entry.pagIbigMidNoField.setText(loggedInMid);
+                entry.pagIbigMidNoField.setEditable(false);
+                entry.pagIbigMidNoField.setFocusable(false);
+                entry.heirsNameField.setText(heir.getHeirsName());
+                entry.heirsRelationshipBox.setSelectedItem(heir.getHeirsRelationship());
+                entry.heirsBirthdateField.setText(
+                    heir.getHeirsBirthdate() != null ? heir.getHeirsBirthdate().toString() : "");
+                entries.add(entry);
+                listPanel.add(entry);
+                listPanel.add(Box.createRigidArea(new Dimension(0, 14)));
+            }
+            listPanel.revalidate();
+            listPanel.repaint();
+        }
+    }
     public void addEntry() {
         heirCount++;
 
         HeirEntry entry = new HeirEntry(heirCount, this);
+
+        // Auto-fill MID from logged-in session and lock it — not user-editable
+        entry.pagIbigMidNoField.setText(loggedInMid);
+        entry.pagIbigMidNoField.setEditable(false);
+        entry.pagIbigMidNoField.setFocusable(false);
 
         entries.add(entry);
         listPanel.add(entry);
@@ -138,26 +173,6 @@ public class HeirsFormView extends JPanel {
 
         listPanel.revalidate();
         listPanel.repaint();
-    }
-
-    // ── Dummy Data ───────────────────────────────────────────────────────────
-    private void loadDummyData() {
-
-        if (entries.size() < 2) return;
-
-        HeirEntry h1 = entries.get(0);
-        h1.pagIbigMidNoField.setText("1234-5678-9012");
-        h1.heirsNameField.setText("Dela Cruz, Maria Santos");
-        h1.heirsBirthdateField.setText("1998-05-21");
-        h1.heirsRelationshipBox.setSelectedItem("Spouse");
-        h1.setReadOnly(true);
-
-        HeirEntry h2 = entries.get(1);
-        h2.pagIbigMidNoField.setText("1234-5678-9012");
-        h2.heirsNameField.setText("Dela Cruz, Juan Miguel");
-        h2.heirsBirthdateField.setText("2018-09-10");
-        h2.heirsRelationshipBox.setSelectedItem("Child");
-        h2.setReadOnly(true);
     }
 
     // ── Remove Entry ─────────────────────────────────────────────────────────
@@ -500,10 +515,9 @@ public class HeirsFormView extends JPanel {
             f.setSize(1200, 850);
             f.setLocationRelativeTo(null);
 
-            f.setContentPane(new HeirsFormView());
+            f.setContentPane(new HeirsFormView("0000-0000-0000"));
 
             f.setVisible(true);
         });
     }
 }
-
