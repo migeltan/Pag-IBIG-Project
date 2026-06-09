@@ -92,9 +92,117 @@ public class LoginFrame extends JFrame {
         passLabel.setForeground(textMuted);
         passLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+        // ── Password field wrapped in a container with eye-toggle button ──────
         passField = new ModernPasswordField("", fieldBg);
-        passField.setAlignmentX(Component.LEFT_ALIGNMENT);
-        passField.setMaximumSize(new Dimension(400, 40));
+
+        JPanel passWrapper = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(fieldBg);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                g2.dispose();
+            }
+        };
+        passWrapper.setOpaque(false);
+        passWrapper.setAlignmentX(Component.LEFT_ALIGNMENT);
+        passWrapper.setMaximumSize(new Dimension(400, 40));
+        passWrapper.setPreferredSize(new Dimension(400, 40));
+
+        // Eye toggle button
+        JButton eyeBtn = new JButton() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int cx = getWidth() / 2;
+                int cy = getHeight() / 2;
+
+                boolean isVisible = passField.getEchoChar() == (char) 0
+                        || (passField.getEchoChar() != '•' && passField.getEchoChar() != '*');
+
+                if (isVisible) {
+                    // Eye-open icon (drawn manually)
+                    drawEyeOpen(g2, cx, cy);
+                } else {
+                    // Eye-closed icon (drawn manually)
+                    drawEyeClosed(g2, cx, cy);
+                }
+                g2.dispose();
+            }
+
+            private void drawEyeOpen(Graphics2D g2, int cx, int cy) {
+                g2.setColor(new Color(117, 117, 117));
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                // Outer eye arc
+                g2.drawArc(cx - 8, cy - 5, 16, 10, 0, 180);
+                g2.drawArc(cx - 8, cy - 5, 16, 10, 180, 180);
+                // Pupil
+                g2.setStroke(new BasicStroke(1.4f));
+                g2.drawOval(cx - 3, cy - 3, 6, 6);
+                // Pupil fill
+                g2.setColor(new Color(117, 117, 117, 180));
+                g2.fillOval(cx - 2, cy - 2, 4, 4);
+            }
+
+            private void drawEyeClosed(Graphics2D g2, int cx, int cy) {
+                g2.setColor(new Color(117, 117, 117));
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                // Upper arc only
+                g2.drawArc(cx - 8, cy - 5, 16, 10, 0, 180);
+                // Slash line through
+                g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(cx - 6, cy + 4, cx + 6, cy - 4);
+            }
+        };
+
+        eyeBtn.setPreferredSize(new Dimension(36, 40));
+        eyeBtn.setContentAreaFilled(false);
+        eyeBtn.setBorderPainted(false);
+        eyeBtn.setFocusPainted(false);
+        eyeBtn.setOpaque(false);
+        eyeBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        eyeBtn.setToolTipText("Show/Hide Password");
+
+        // Track whether password is being shown
+        final boolean[] passwordVisible = {false};
+
+        eyeBtn.addActionListener(e -> {
+            passwordVisible[0] = !passwordVisible[0];
+
+            // Only toggle if it's not showing placeholder
+            boolean isPlaceholder = passField.getForeground().equals(Color.GRAY);
+            if (!isPlaceholder) {
+                if (passwordVisible[0]) {
+                    passField.setEchoChar((char) 0);   // show password
+                } else {
+                    passField.setEchoChar('•');         // hide password
+                }
+            }
+            eyeBtn.repaint();
+        });
+
+        // Sync eye button state when field gains/loses focus
+        passField.addFocusListener(new FocusListener() {
+            @Override public void focusGained(FocusEvent e) {
+                // Reset eye to hidden when user starts typing
+                if (passField.getForeground().equals(Color.GRAY)) {
+                    passwordVisible[0] = false;
+                    eyeBtn.repaint();
+                }
+            }
+            @Override public void focusLost(FocusEvent e) {
+                // If field is empty and goes back to placeholder, reset
+                if (String.valueOf(passField.getPassword()).isEmpty()) {
+                    passwordVisible[0] = false;
+                    eyeBtn.repaint();
+                }
+            }
+        });
+
+        passWrapper.add(passField, BorderLayout.CENTER);
+        passWrapper.add(eyeBtn,   BorderLayout.EAST);
+        // ─────────────────────────────────────────────────────────────────────
 
         JPanel optionsRow = new JPanel(new BorderLayout());
         optionsRow.setOpaque(false);
@@ -138,7 +246,7 @@ public class LoginFrame extends JFrame {
             boolean valid = dao.verifyLogin(mid, pass);
 
             if (valid) {
-                new SignInFrame(mid);   // ← pass the authenticated MID
+                new SignInFrame(mid);
                 dispose();
             } else {
                 JOptionPane.showMessageDialog(
@@ -162,7 +270,7 @@ public class LoginFrame extends JFrame {
         leftPanel.add(Box.createRigidArea(new Dimension(0, 20)));
         leftPanel.add(passLabel);
         leftPanel.add(Box.createRigidArea(new Dimension(0, 5)));
-        leftPanel.add(passField);
+        leftPanel.add(passWrapper);   // ← use wrapper instead of passField directly
         leftPanel.add(Box.createRigidArea(new Dimension(0, 10)));
         leftPanel.add(optionsRow);
         leftPanel.add(Box.createRigidArea(new Dimension(0, 20)));
@@ -318,7 +426,8 @@ public class LoginFrame extends JFrame {
     class ModernTextField extends JTextField {
         public ModernTextField(String placeholder, Color bgColor) {
             setOpaque(false);
-            setBorder(new EmptyBorder(10, 15, 10, 15));            setFont(new Font("Arial", Font.PLAIN, 14));
+            setBorder(new EmptyBorder(10, 15, 10, 15));
+            setFont(new Font("Arial", Font.PLAIN, 14));
             setForeground(Color.GRAY);
             setText(placeholder);
             addFocusListener(new FocusListener() {
@@ -353,27 +462,40 @@ public class LoginFrame extends JFrame {
         }
     }
 
+    /**
+     * Password field with placeholder support.
+     * The eye-toggle button lives OUTSIDE this class (in the passWrapper panel).
+     * Echo char is managed by the toggle button's ActionListener.
+     */
     class ModernPasswordField extends JPasswordField {
+        private final String placeholder = "";
+
         public ModernPasswordField(String placeholder, Color bgColor) {
             setOpaque(false);
-            setBorder(new EmptyBorder(10, 15, 10, 15));
+            setBorder(new EmptyBorder(10, 15, 10, 5));  // reduced right padding; eye btn takes the space
             setFont(new Font("Arial", Font.PLAIN, 14));
             setForeground(Color.GRAY);
             setText(placeholder);
-            setEchoChar((char) 0);
+            setEchoChar((char) 0);  // show placeholder text as plain
+
             addFocusListener(new FocusListener() {
                 @Override public void focusGained(FocusEvent e) {
                     if (String.valueOf(getPassword()).equals(placeholder)) {
-                        setText(""); setForeground(Color.BLACK); setEchoChar('•');
+                        setText("");
+                        setForeground(Color.BLACK);
+                        setEchoChar('•');  // hide by default when user starts typing
                     }
                 }
                 @Override public void focusLost(FocusEvent e) {
                     if (String.valueOf(getPassword()).isEmpty()) {
-                        setEchoChar((char) 0); setText(placeholder); setForeground(Color.GRAY);
+                        setEchoChar((char) 0);
+                        setText(placeholder);
+                        setForeground(Color.GRAY);
                     }
                 }
             });
         }
+
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
