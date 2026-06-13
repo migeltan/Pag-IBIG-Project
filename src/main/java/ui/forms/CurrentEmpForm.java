@@ -195,10 +195,10 @@ public class CurrentEmpForm extends JPanel {
         }
     }
 
- // ── Date Validation ─────────────────────────────────────────────────────
     private String validateDate(String dateStr) {
-        // Must be complete
-        if (dateStr.length() != 10) return "Date must be in YYYY-MM-DD format.";
+        // Must be complete and properly formatted
+        if (dateStr == null || !dateStr.matches("\\d{4}-\\d{2}-\\d{2}"))
+            return "Date must be in YYYY-MM-DD format.";
 
         int year, month, day;
         try {
@@ -215,12 +215,12 @@ public class CurrentEmpForm extends JPanel {
         if (year < 1900 || year > currentYear)
             return "Year must be between 1900 and " + currentYear + ".";
 
-        // Month check
+        // Month check — must come before day so maxDays is meaningful
         if (month < 1 || month > 12)
             return "Month must be between 01 and 12.";
 
-        // Day check — how many days in that month/year
-        int maxDays;
+        // Day check — max days depends on month AND year (leap year)
+        final int maxDays;
         switch (month) {
             case 1: case 3: case 5: case 7:
             case 8: case 10: case 12:
@@ -228,20 +228,24 @@ public class CurrentEmpForm extends JPanel {
             case 4: case 6: case 9: case 11:
                 maxDays = 30; break;
             case 2:
-                // Leap year check
                 boolean isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
-                maxDays = isLeap ? 29 : 28;
-                break;
+                maxDays = isLeap ? 29 : 28; break;
             default:
-                maxDays = 30;
+                return "Month must be between 01 and 12."; // unreachable, but safe
         }
 
         if (day < 1 || day > maxDays)
-            return "Day must be between 01 and " + maxDays + " for the selected month.";
+            return "Day must be between 01 and " + maxDays
+                   + (month == 2 ? " for " + year + " (February)." : " for the selected month.");
 
         // Cannot be in the future
-        if (java.time.LocalDate.of(year, month, day).isAfter(java.time.LocalDate.now()))
-            return "Date Employed cannot be in the future.";
+        try {
+            java.time.LocalDate entered = java.time.LocalDate.of(year, month, day);
+            if (entered.isAfter(java.time.LocalDate.now()))
+                return "Date Employed cannot be in the future.";
+        } catch (java.time.DateTimeException e) {
+            return "Invalid date. Please check the day, month, and year.";
+        }
 
         return null; // null = valid
     }
@@ -495,13 +499,28 @@ public class CurrentEmpForm extends JPanel {
                 }
             }
         });
+        
         dateEmployedField.addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
+                // First, pad single-digit month/day
                 applyDatePadAndFormat(dateEmployedField);
+
+                // Then validate — only if the field is non-empty and fully typed
+                String text = dateEmployedField.getText().trim();
+                if (text.isEmpty() || text.length() < 10) return; // let handleSave catch incomplete
+
+                String error = validateDate(text);
+                if (error != null) {
+                    showError(error);
+                    // Clear the field so the user must re-enter
+                    SwingUtilities.invokeLater(() -> {
+                        setDateTextDirect(dateEmployedField, "");
+                        dateEmployedField.requestFocusInWindow();
+                    });
+                }
             }
         });
-
         c.add(r1);
         c.add(gap(16));
 

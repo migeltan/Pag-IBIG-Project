@@ -323,13 +323,13 @@ public class MemberInfoForm extends JFrame {
         }
 
         // ── Validate birthdate format ────────────────────────────────────────
-        Date birthdate;
-        try {
-            birthdate = Date.valueOf(birthdateField.getText().trim());
-        } catch (IllegalArgumentException ex) {
-            showError("Birthdate must be in YYYY-MM-DD format.");
+     // ── Validate birthdate format ────────────────────────────────────────
+        String dateError = validateDate(birthdateField.getText().trim());
+        if (dateError != null) {
+            showError(dateError);
             return;
         }
+        Date birthdate = Date.valueOf(birthdateField.getText().trim());
 
         // ── Build MemberTable object ─────────────────────────────────────────
         String mid = RegistrationSession.getInstance().getTempMID();
@@ -661,10 +661,23 @@ public class MemberInfoForm extends JFrame {
                 }
             }
         });
+        
         field.addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
                 applyDatePadAndFormat(field);
+
+                String text = field.getText().trim();
+                if (text.isEmpty() || text.length() < 10) return;
+
+                String error = validateDate(text);
+                if (error != null) {
+                    showError(error);
+                    SwingUtilities.invokeLater(() -> {
+                        field.setText("");
+                        field.requestFocusInWindow();
+                    });
+                }
             }
         });
 
@@ -899,6 +912,53 @@ public class MemberInfoForm extends JFrame {
     private boolean isComboDefault(JComboBox<?> b) { return "Select".equals(b.getSelectedItem()); }
     private void showError(String msg) {
         JOptionPane.showMessageDialog(this, msg, "Validation Error", JOptionPane.WARNING_MESSAGE);
+    }
+    
+    private String validateDate(String dateStr) {
+        if (dateStr == null || !dateStr.matches("\\d{4}-\\d{2}-\\d{2}"))
+            return "Date must be in YYYY-MM-DD format.";
+
+        int year, month, day;
+        try {
+            year  = Integer.parseInt(dateStr.substring(0, 4));
+            month = Integer.parseInt(dateStr.substring(5, 7));
+            day   = Integer.parseInt(dateStr.substring(8, 10));
+        } catch (NumberFormatException e) {
+            return "Date must be in YYYY-MM-DD format.";
+        }
+
+        int currentYear = java.time.LocalDate.now().getYear();
+
+        if (year < 1900 || year > currentYear)
+            return "Year must be between 1900 and " + currentYear + ".";
+
+        if (month < 1 || month > 12)
+            return "Month must be between 01 and 12.";
+
+        final int maxDays;
+        switch (month) {
+            case 1: case 3: case 5: case 7:
+            case 8: case 10: case 12: maxDays = 31; break;
+            case 4: case 6: case 9: case 11: maxDays = 30; break;
+            case 2:
+                boolean isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+                maxDays = isLeap ? 29 : 28; break;
+            default: return "Month must be between 01 and 12.";
+        }
+
+        if (day < 1 || day > maxDays)
+            return "Day must be between 01 and " + maxDays
+                   + (month == 2 ? " for " + year + " (February)." : " for the selected month.");
+
+        try {
+            java.time.LocalDate entered = java.time.LocalDate.of(year, month, day);
+            if (entered.isAfter(java.time.LocalDate.now()))
+                return "Birthdate cannot be in the future.";
+        } catch (java.time.DateTimeException e) {
+            return "Invalid date. Please check the day, month, and year.";
+        }
+
+        return null;
     }
 
     // ── Section Header ────────────────────────────────────────────────────────

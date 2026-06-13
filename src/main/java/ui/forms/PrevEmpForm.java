@@ -695,6 +695,18 @@ public class PrevEmpForm extends JPanel {
                     @Override
                     public void focusLost(FocusEvent e) {
                         applyDatePadAndFormat(dateField);
+
+                        String text = dateField.getText().trim();
+                        if (text.isEmpty() || text.length() < 10) return; // let save catch incomplete
+
+                        String error = validateDate(text);
+                        if (error != null) {
+                            showError(error);
+                            SwingUtilities.invokeLater(() -> {
+                                dateField.setText("");
+                                dateField.requestFocusInWindow();
+                            });
+                        }
                     }
                 });
             }
