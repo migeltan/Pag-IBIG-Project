@@ -107,7 +107,7 @@ public class HeirsFormView extends JPanel {
         returnBtn.addActionListener(e -> {
     	    Window window = SwingUtilities.getWindowAncestor(HeirsFormView.this);
     	    if (window != null) window.dispose();
-    	    new SignInFrame(); // go back to the dashboard
+    	    new SignInFrame(loggedInMid); // go back to the dashboard
     	});
 
         buttonPanel.add(returnBtn);
@@ -132,6 +132,7 @@ public class HeirsFormView extends JPanel {
 
     // ── Load heirs from DB for this MID ──────────────────────────────────────
     private void loadFromDatabase() {
+        System.out.println("Loading heirs for MID: " + loggedInMid); // debug
         HeirsDAO dao = new HeirsDAO();
         List<HeirsTable> saved = dao.getHeirsByMID(loggedInMid);
 

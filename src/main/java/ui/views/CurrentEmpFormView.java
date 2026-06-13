@@ -53,7 +53,7 @@ public class CurrentEmpFormView extends JPanel {
                 g2.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        bg.setLayout(new GridBagLayout());
+        bg.setLayout(new BorderLayout());
 
         JPanel card = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -72,7 +72,6 @@ public class CurrentEmpFormView extends JPanel {
             }
         };
         card.setOpaque(false);
-        card.setPreferredSize(new Dimension(920, 520));
         card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(40, 45, 35, 45));
 
@@ -84,13 +83,17 @@ public class CurrentEmpFormView extends JPanel {
         JLabel heading = new JLabel("Current Employment Record");
         heading.setFont(new Font("Arial Black", Font.BOLD, 24));
         heading.setForeground(textWhite);
+        heading.setAlignmentX(Component.LEFT_ALIGNMENT);
+
         JLabel subHeading = new JLabel("View and manage your current employment information.");
         subHeading.setFont(new Font("Arial", Font.PLAIN, 13));
         subHeading.setForeground(new Color(255, 255, 255, 160));
+        subHeading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JPanel titleBlock = new JPanel();
         titleBlock.setOpaque(false);
         titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
+        titleBlock.setAlignmentX(Component.LEFT_ALIGNMENT);
         titleBlock.add(heading);
         titleBlock.add(Box.createRigidArea(new Dimension(0, 6)));
         titleBlock.add(subHeading);
@@ -112,7 +115,7 @@ public class CurrentEmpFormView extends JPanel {
         r1.add(fieldPanel("COMPANY", companyBox));
 
         JPanel r2 = row(2);
-        r2.add(fieldPanel("OCCUPATION *",              occupationField   = buildTextField()));
+        r2.add(fieldPanel("OCCUPATION *",                 occupationField   = buildTextField()));
         r2.add(fieldPanel("DATE EMPLOYED (YYYY-MM-DD) *", dateEmployedField = buildTextField()));
 
         JPanel r3 = row(3);
@@ -128,8 +131,9 @@ public class CurrentEmpFormView extends JPanel {
         })));
 
         // ── Buttons ───────────────────────────────────────────────────────────
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         buttonPanel.setOpaque(false);
+        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JButton returnBtn = buildButton("Back", accentRed);
         editSaveBtn       = buildButton("Edit", accentAmber);
@@ -164,7 +168,13 @@ public class CurrentEmpFormView extends JPanel {
         content.add(buttonPanel);
 
         card.add(content, BorderLayout.CENTER);
-        bg.add(card);
+
+        JPanel cardWrap = new JPanel(new BorderLayout());
+        cardWrap.setOpaque(false);
+        cardWrap.setBorder(new EmptyBorder(28, 28, 28, 28));
+        cardWrap.add(card, BorderLayout.CENTER);
+
+        bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
         if (loggedInMID != null && !loggedInMID.isEmpty()) {
@@ -191,7 +201,6 @@ public class CurrentEmpFormView extends JPanel {
         setComboByValue(typeOfWorkBox, record.getTypeOfWork());
         setComboByValue(countryOfAssignmentBox, record.getCountryOfAssignment());
 
-        // Set company dropdown by matching company code
         String code = record.getCompanyCode();
         for (int i = 0; i < companyBox.getItemCount(); i++) {
             String item = companyBox.getItemAt(i);
@@ -224,7 +233,6 @@ public class CurrentEmpFormView extends JPanel {
             showError("Date must be in YYYY-MM-DD format."); return;
         }
 
-        // Extract company code from selected item
         String selected = (String) companyBox.getSelectedItem();
         String companyCode = selected.substring(selected.lastIndexOf("(") + 1, selected.lastIndexOf(")"));
 
@@ -350,7 +358,9 @@ public class CurrentEmpFormView extends JPanel {
 
     private JPanel row(int cols) {
         JPanel p = new JPanel(new GridLayout(1, cols, 18, 0)); p.setOpaque(false);
-        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 75)); return p;
+        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 75));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return p;
     }
 
     public static void main(String[] args) {

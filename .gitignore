@@ -1,4 +1,7 @@
 .project
 .classpath
 .settings/
-/target/
+target/
+
+# Database config
+database/database/DatabaseConnection.java
