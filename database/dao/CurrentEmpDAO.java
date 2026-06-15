@@ -1,9 +1,12 @@
 package dao;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
 import database.DatabaseConnection;
 import models.CurrentEmpRecordTable;
-
-import java.sql.*;
 
 public class CurrentEmpDAO {
 	
@@ -110,28 +113,5 @@ public class CurrentEmpDAO {
     }
     
  // ─── UPDATE ───────────────────────────────────────────────────────────────
-    public boolean updateCurrentEmp(CurrentEmpRecordTable record) {
-        String sql = "UPDATE currentemprecordtable SET "
-                + "Company_Code = ?, Occupation = ?, Employment_Status = ?, "
-                + "TypeOfWork = ?, Country_Of_Assignment = ?, Date_Employed = ? "
-                + "WHERE PagIbig_MID_No = ?";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setString(1, record.getCompanyCode());
-            ps.setString(2, record.getOccupation());
-            ps.setString(3, record.getEmploymentStatus());
-            ps.setString(4, record.getTypeOfWork());
-            ps.setString(5, record.getCountryOfAssignment());
-            ps.setDate  (6, record.getDateEmployed());
-            ps.setString(7, record.getPagIbigMIDNo()); // WHERE clause
-
-            return ps.executeUpdate() > 0;
-
-        } catch (SQLException e) {
-            System.err.println("[CurrentEmpDAO] updateCurrentEmp error: " + e.getMessage());
-            return false;
-        }
-    }
+    
 }

@@ -1,16 +1,45 @@
 package ui.views;
 
-import dao.MemberDAO;
-import models.MemberTable;
-import ui.frames.SignInFrame;
-
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
+import java.awt.RenderingHints;
+import java.awt.Window;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.math.BigDecimal;
 import java.sql.Date;
 
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicScrollBarUI;
+
+import dao.MemberDAO;
+import models.MemberTable;
+import ui.frames.SignInFrame;
 
 
 public class MemberInfoFormView extends JPanel {
@@ -21,6 +50,11 @@ public class MemberInfoFormView extends JPanel {
     private final Color accentRed   = new Color(255, 99, 132);
     private final Color accentAmber = new Color(251, 191, 36);
     private final Color textWhite   = Color.WHITE;
+
+    // Scrollbar track/thumb colours that match the dark glass panel
+    private final Color scrollTrack = new Color(255, 255, 255, 18);
+    private final Color scrollThumb = new Color(96, 216, 164, 120);
+    private final Color scrollThumbHover = new Color(96, 216, 164, 200);
 
     private final String loggedInMID;
     private boolean editMode = false;
@@ -59,6 +93,9 @@ public class MemberInfoFormView extends JPanel {
         initUI();
     }
 
+    // =========================================================================
+    // initUI
+    // =========================================================================
     private void initUI() {
         setLayout(new BorderLayout());
 
@@ -93,6 +130,7 @@ public class MemberInfoFormView extends JPanel {
         card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(24, 24, 24, 24));
 
+        // ── Header ────────────────────────────────────────────────────────────
         JPanel header = new JPanel();
         header.setOpaque(false);
         header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
@@ -106,12 +144,9 @@ public class MemberInfoFormView extends JPanel {
         header.add(Box.createRigidArea(new Dimension(0, 5)));
         header.add(sub);
 
+        // ── Scroll pane (custom styled) ───────────────────────────────────────
         contentPanel = buildContent();
-        JScrollPane scroll = new JScrollPane(contentPanel);
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.setBorder(null);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        JScrollPane scroll = buildScrollPane(contentPanel);
 
         // ── Buttons ───────────────────────────────────────────────────────────
         JButton backBtn = buildButton("Back", accentRed);
@@ -136,7 +171,6 @@ public class MemberInfoFormView extends JPanel {
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         bottom.setOpaque(false);
         bottom.setBorder(new EmptyBorder(18, 0, 0, 0));
-        bottom.add(saveBtn);
         bottom.add(backBtn);
         bottom.add(editSaveBtn);
 
@@ -159,7 +193,88 @@ public class MemberInfoFormView extends JPanel {
         lockAllFields();
     }
 
-    // ── Handle Update ─────────────────────────────────────────────────────────
+    // =========================================================================
+    // Custom scroll pane — glass-style, thin accent-green thumb
+    // =========================================================================
+    private JScrollPane buildScrollPane(JPanel content) {
+        JScrollPane scroll = new JScrollPane(content) {
+            @Override protected void paintComponent(Graphics g) {
+                // Transparent — parent card paints the glass surface
+                super.paintComponent(g);
+            }
+        };
+
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.setBorder(null);
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+
+        // ── Style vertical scrollbar ──────────────────────────────────────────
+        scroll.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
+
+            @Override
+            protected void configureScrollBarColors() {
+                thumbColor      = scrollThumb;
+                trackColor      = scrollTrack;
+            }
+
+            // Thin bar width
+            @Override
+            public Dimension getPreferredSize(JComponent c) {
+                return new Dimension(6, super.getPreferredSize(c).height);
+            }
+
+            // Remove arrow buttons entirely
+            @Override
+            protected JButton createDecreaseButton(int orientation) { return invisibleBtn(); }
+            @Override
+            protected JButton createIncreaseButton(int orientation) { return invisibleBtn(); }
+
+            private JButton invisibleBtn() {
+                JButton b = new JButton();
+                b.setPreferredSize(new Dimension(0, 0));
+                b.setMinimumSize(new Dimension(0, 0));
+                b.setMaximumSize(new Dimension(0, 0));
+                b.setVisible(false);
+                return b;
+            }
+
+            // Paint track — semi-transparent pill
+            @Override
+            protected void paintTrack(Graphics g, JComponent c, java.awt.Rectangle trackBounds) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(scrollTrack);
+                g2.fillRoundRect(trackBounds.x + 1, trackBounds.y,
+                        trackBounds.width - 2, trackBounds.height, 6, 6);
+                g2.dispose();
+            }
+
+            // Paint thumb — accent-green pill
+            @Override
+            protected void paintThumb(Graphics g, JComponent c, java.awt.Rectangle thumbBounds) {
+                if (thumbBounds.isEmpty()) return;
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                boolean hovered = isThumbRollover();
+                g2.setColor(hovered ? scrollThumbHover : scrollThumb);
+                g2.fillRoundRect(thumbBounds.x + 1, thumbBounds.y + 2,
+                        thumbBounds.width - 2, thumbBounds.height - 4, 6, 6);
+                g2.dispose();
+            }
+        });
+
+        scroll.getVerticalScrollBar().setOpaque(false);
+        scroll.getVerticalScrollBar().setBackground(new Color(0, 0, 0, 0));
+
+        return scroll;
+    }
+
+    // =========================================================================
+    // Handle Update
+    // =========================================================================
     private void handleUpdate() {
         if (memberNameField.getText().trim().isEmpty()) { showError("Member name is required."); return; }
         if (birthdateField.getText().trim().isEmpty())  { showError("Birthdate is required.");   return; }
@@ -169,22 +284,20 @@ public class MemberInfoFormView extends JPanel {
         try { birthdate = Date.valueOf(birthdateField.getText().trim()); }
         catch (IllegalArgumentException ex) { showError("Birthdate must be YYYY-MM-DD."); return; }
 
-        // Resolve membership type — if Others selected, use the text field value
         String membershipType = (String) membershipTypeBox.getSelectedItem();
         String membershipTypeOthers = null;
         if ("Others".equals(membershipType)) {
             membershipTypeOthers = membershipTypeOthersField.getText().trim();
-            membershipType = "EMPLOYED"; // fallback DB value
+            membershipType = "EMPLOYED";
         } else {
             membershipType = toMembershipTypeEnum(membershipType);
         }
 
-        // Resolve membership category
         String membershipCategory = (String) membershipCategoryBox.getSelectedItem();
         String membershipCategoryOthers = null;
         if ("Others".equals(membershipCategory)) {
             membershipCategoryOthers = membershipCategoryOthersField.getText().trim();
-            membershipCategory = "OTHER EARNING GROUPS"; // fallback DB value
+            membershipCategory = "OTHER EARNING GROUPS";
         } else {
             membershipCategory = toMembershipCategoryEnum(membershipCategory);
         }
@@ -233,7 +346,9 @@ public class MemberInfoFormView extends JPanel {
         lockAllFields();
     }
 
-    // ── Load Real Data ────────────────────────────────────────────────────────
+    // =========================================================================
+    // Load Real Data
+    // =========================================================================
     private void loadMemberData(String mid) {
         MemberDAO dao = new MemberDAO();
         MemberTable m = dao.getMemberById(mid);
@@ -246,14 +361,11 @@ public class MemberInfoFormView extends JPanel {
 
         pagIbigMidNoField.setText(safe(m.getPagIbigMIDNo()));
 
-        // ── Membership Type ───────────────────────────────────────────────────
         String dbType = safe(m.getMembershipType());
         boolean typeMatched = false;
         for (int i = 0; i < membershipTypeBox.getItemCount(); i++) {
             if (membershipTypeBox.getItemAt(i).equalsIgnoreCase(dbType)) {
-                membershipTypeBox.setSelectedIndex(i);
-                typeMatched = true;
-                break;
+                membershipTypeBox.setSelectedIndex(i); typeMatched = true; break;
             }
         }
         if (!typeMatched && !dbType.isEmpty()) {
@@ -268,14 +380,11 @@ public class MemberInfoFormView extends JPanel {
             }
         }
 
-        // ── Membership Category ───────────────────────────────────────────────
         String dbCategory = safe(m.getMembershipCategory());
         boolean categoryMatched = false;
         for (int i = 0; i < membershipCategoryBox.getItemCount(); i++) {
             if (membershipCategoryBox.getItemAt(i).equalsIgnoreCase(dbCategory)) {
-                membershipCategoryBox.setSelectedIndex(i);
-                categoryMatched = true;
-                break;
+                membershipCategoryBox.setSelectedIndex(i); categoryMatched = true; break;
             }
         }
         if (!categoryMatched && !dbCategory.isEmpty()) {
@@ -320,7 +429,9 @@ public class MemberInfoFormView extends JPanel {
         totalMoIncomeField.setText(     m.getTotalMoIncome()     != null ? m.getTotalMoIncome().toPlainString()     : "");
     }
 
-    // ── Lock / Unlock ─────────────────────────────────────────────────────────
+    // =========================================================================
+    // Lock / Unlock
+    // =========================================================================
     private void lockAllFields() {
         for (JTextField f : allTextFields()) { f.setEditable(false); f.setFocusable(false); }
         for (JComboBox<?> b : allCombos())   { b.setEnabled(false); }
@@ -354,12 +465,14 @@ public class MemberInfoFormView extends JPanel {
         };
     }
 
-    // ── Build Content ─────────────────────────────────────────────────────────
+    // =========================================================================
+    // Build Content
+    // =========================================================================
     private JPanel buildContent() {
         JPanel c = new JPanel();
         c.setOpaque(false);
         c.setLayout(new BoxLayout(c, BoxLayout.Y_AXIS));
-        c.setBorder(new EmptyBorder(20, 0, 20, 0));
+        c.setBorder(new EmptyBorder(20, 0, 20, 12)); // right padding gives scrollbar breathing room
 
         // ── Membership Information ────────────────────────────────────────────
         c.add(sectionHeader("Membership Information")); c.add(vgap(12));
@@ -370,7 +483,6 @@ public class MemberInfoFormView extends JPanel {
                 "Select","EMPLOYED","OVERSEAS FILIPINO WORKER","SELF-EMPLOYED","Others"})));
         c.add(r1); c.add(vgap(8));
 
-        // Membership Type Others
         membershipTypeOthersField = tf();
         membershipTypeOthersPanel = new JPanel(new GridLayout(1, 1, 0, 0));
         membershipTypeOthersPanel.setOpaque(false);
@@ -388,7 +500,6 @@ public class MemberInfoFormView extends JPanel {
                 "Select","EMPLOYED","UNEMPLOYED","FIRST TIME JOBSEEKERS"})));
         c.add(r2); c.add(vgap(8));
 
-        // Membership Category Others
         membershipCategoryOthersField = tf();
         membershipCategoryOthersPanel = new JPanel(new GridLayout(1, 1, 0, 0));
         membershipCategoryOthersPanel.setOpaque(false);
@@ -403,7 +514,6 @@ public class MemberInfoFormView extends JPanel {
         r3.add(lf("CRN", crnField = tf()));
         c.add(r3); c.add(vgap(24));
 
-        // Listeners — show/hide Others panels on selection
         membershipTypeBox.addActionListener(e -> {
             boolean show = "Others".equals(membershipTypeBox.getSelectedItem());
             membershipTypeOthersPanel.setVisible(show);
@@ -497,7 +607,9 @@ public class MemberInfoFormView extends JPanel {
         memberNameField.setText("No data loaded");
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // =========================================================================
+    // Helpers
+    // =========================================================================
     private void setCombo(JComboBox<String> box, String value) {
         if (value == null || value.isEmpty()) return;
         for (int i = 0; i < box.getItemCount(); i++) {
@@ -560,11 +672,35 @@ public class MemberInfoFormView extends JPanel {
         }
     }
 
-    // ── UI Helpers ────────────────────────────────────────────────────────────
+    // =========================================================================
+    // UI Helpers
+    // =========================================================================
     private JPanel sectionHeader(String text) {
         JPanel p = new JPanel(new BorderLayout()); p.setOpaque(false);
-        JLabel l = new JLabel(text); l.setForeground(accentGreen);
-        l.setFont(new Font("Arial Black", Font.BOLD, 15)); p.add(l, BorderLayout.WEST); return p;
+        // Subtle separator line above each section
+        JPanel lineWrap = new JPanel(new BorderLayout());
+        lineWrap.setOpaque(false);
+        lineWrap.setBorder(new EmptyBorder(0, 0, 10, 0));
+
+        JPanel line = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(new Color(96, 216, 164, 55));
+                g2.fillRect(0, 0, getWidth(), 1);
+                g2.dispose();
+            }
+        };
+        line.setOpaque(false);
+        line.setPreferredSize(new Dimension(0, 1));
+
+        JLabel l = new JLabel(text);
+        l.setForeground(accentGreen);
+        l.setFont(new Font("Arial Black", Font.BOLD, 13));
+        l.setBorder(new EmptyBorder(0, 0, 4, 0));
+
+        p.add(line, BorderLayout.NORTH);
+        p.add(l, BorderLayout.SOUTH);
+        return p;
     }
 
     private JButton buildButton(String text, Color color) {
@@ -599,6 +735,7 @@ public class MemberInfoFormView extends JPanel {
         p.add(l, BorderLayout.NORTH); p.add(field, BorderLayout.CENTER); return p;
     }
 
+    // ── Text field ─────────────────────────────────────────────────────────────
     private JTextField tf() {
         JTextField field = new JTextField() {
             @Override protected void paintComponent(Graphics g) {
@@ -624,55 +761,197 @@ public class MemberInfoFormView extends JPanel {
         return field;
     }
 
+    // ── Combo box — glass style matching text fields ────────────────────────────
     private JComboBox<String> cb(String[] items) {
-        JComboBox<String> box = new JComboBox<>(items);
-        box.setFont(new Font("Arial", Font.BOLD, 13));
-        box.setForeground(new Color(50, 50, 50));
-        box.setForeground(new Color(30, 30, 30));
-        box.setBackground(Color.WHITE);
-        box.setOpaque(true);
 
+        JComboBox<String> box = new JComboBox<String>(items) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                if (isEnabled()) {
+                    // Edit mode: glass fill + solid accent-green border
+                    g2.setColor(new Color(255, 255, 255, 14));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                    g2.setStroke(new BasicStroke(1.5f));
+                    g2.setColor(new Color(96, 216, 164, 160));
+                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                } else {
+                    // Read-only: near-invisible fill + dashed subtle border
+                    g2.setColor(new Color(255, 255, 255, 6));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                    g2.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT,
+                            BasicStroke.JOIN_MITER, 1f, new float[]{4f, 3f}, 0f));
+                    g2.setColor(new Color(255, 255, 255, 45));
+                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                }
+
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+
+        box.setOpaque(false);
+        box.setBackground(new Color(0, 0, 0, 0));
+        box.setForeground(new Color(225, 225, 225));  // default bright white
+        box.setFont(new Font("Arial", Font.PLAIN, 13));
+        box.setBorder(new EmptyBorder(8, 12, 8, 8));
+        box.setFocusable(true);
+
+        // Force the internal editor component (what actually renders the text) to white
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                Component editor = box.getEditor().getEditorComponent();
+                if (editor instanceof JTextField) {
+                    JTextField tf = (JTextField) editor;
+                    tf.setForeground(new Color(225, 225, 225));
+                    tf.setBackground(new Color(0, 0, 0, 0));
+                    tf.setOpaque(false);
+                    tf.setBorder(new EmptyBorder(0, 0, 0, 0));
+                }
+            }
+        });
+
+        // Re-apply white foreground whenever enabled state changes
+        box.addPropertyChangeListener("enabled", new java.beans.PropertyChangeListener() {
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                boolean enabled = Boolean.TRUE.equals(evt.getNewValue());
+                // Update the internal editor text color
+                Component editor = box.getEditor().getEditorComponent();
+                if (editor instanceof JTextField) {
+                    ((JTextField) editor).setForeground(
+                        enabled ? new Color(225, 225, 225) : new Color(160, 185, 210));
+                }
+                // Show/hide arrow
+                for (Component comp : box.getComponents()) {
+                    if (comp instanceof JButton) {
+                        comp.setVisible(enabled);
+                    }
+                }
+                box.repaint();
+            }
+        });
+
+        // Arrow button — transparent; hidden when read-only
+        for (Component comp : box.getComponents()) {
+            if (comp instanceof JButton) {
+                JButton arrowBtn = (JButton) comp;
+                arrowBtn.setOpaque(false);
+                arrowBtn.setContentAreaFilled(false);
+                arrowBtn.setBorderPainted(false);
+                arrowBtn.setForeground(accentGreen);
+            }
+        }
+
+        // Renderer: two visual states — locked (muted) vs editable (bright)
         box.setRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value,
                     int index, boolean isSelected, boolean cellHasFocus) {
                 super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-                setBackground(isSelected ? new Color(21, 101, 192) : Color.WHITE);
-                setForeground(isSelected ? Color.WHITE : new Color(30, 30, 30));
-                setFont(new Font("Arial", Font.PLAIN, 13));
-                setBorder(new EmptyBorder(5, 10, 5, 10));
-                setOpaque(true);
+
+                boolean enabled = box.isEnabled();
+
+                if (index == -1) {
+                    // Selected value displayed inside the box
+                    setOpaque(false);
+                    setBackground(new Color(0, 0, 0, 0));
+                    if (enabled) {
+                        // Editable: bright readable white
+                        setForeground(new Color(225, 225, 225));
+                        setFont(new Font("Arial", Font.PLAIN, 13));
+                    } else {
+                        // Locked: steel-blue muted tone — readable but clearly inactive
+                        setForeground(new Color(160, 185, 210));
+                        setFont(new Font("Arial", Font.PLAIN, 13));
+                    }
+                    setBorder(new EmptyBorder(0, 0, 0, 0));
+                } else {
+                    // Dropdown list rows
+                    if (isSelected) {
+                        setBackground(new Color(21, 101, 192));
+                        setForeground(Color.WHITE);
+                    } else {
+                        setBackground(new Color(13, 32, 64));
+                        setForeground(new Color(210, 220, 235));
+                    }
+                    setOpaque(true);
+                    setFont(new Font("Arial", Font.PLAIN, 13));
+                    setBorder(new EmptyBorder(7, 12, 7, 12));
+                }
+
                 return this;
             }
         });
 
-        // Force the display area (not just dropdown list) to show white text
-        box.addPropertyChangeListener("UI", evt -> {
-            Component editor = box.getEditor().getEditorComponent();
-            if (editor instanceof JTextField) {
-                ((JTextField) editor).setForeground(new Color(50, 50, 50));
-                ((JTextField) editor).setBackground(Color.WHITE);
-            }
-        });
+        // Dark popup list styling
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                Object popup = box.getUI().getAccessibleChild(box, 0);
+                if (popup instanceof javax.swing.plaf.basic.ComboPopup) {
+                    javax.swing.plaf.basic.ComboPopup cp =
+                            (javax.swing.plaf.basic.ComboPopup) popup;
+                    JList<?> list = cp.getList();
+                    list.setBackground(new Color(13, 32, 64));
+                    list.setForeground(new Color(210, 220, 235));
+                    list.setBorder(new EmptyBorder(4, 0, 4, 0));
 
-        // Immediately set editor colors
-        SwingUtilities.invokeLater(() -> {
-            Component editor = box.getEditor().getEditorComponent();
-            if (editor instanceof JTextField) {
-                ((JTextField) editor).setForeground(new Color(30, 30, 30));
-                ((JTextField) editor).setBackground(new Color(20, 35, 60));
+                    Component parent = list.getParent();
+                    while (parent != null) {
+                        if (parent instanceof JScrollPane) {
+                            JScrollPane sp = (JScrollPane) parent;
+                            sp.setBorder(javax.swing.BorderFactory.createLineBorder(
+                                    new Color(96, 216, 164, 100), 1));
+                            sp.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
+                                @Override protected void configureScrollBarColors() {
+                                    thumbColor = new Color(96, 216, 164, 140);
+                                    trackColor = new Color(10, 22, 40, 200);
+                                }
+                                @Override protected JButton createDecreaseButton(int o) { return zeroBtn(); }
+                                @Override protected JButton createIncreaseButton(int o) { return zeroBtn(); }
+                                private JButton zeroBtn() {
+                                    JButton b = new JButton();
+                                    b.setPreferredSize(new Dimension(0, 0));
+                                    b.setVisible(false);
+                                    return b;
+                                }
+                                @Override protected void paintTrack(Graphics g, JComponent c, java.awt.Rectangle r) {
+                                    g.setColor(new Color(10, 22, 40, 180));
+                                    g.fillRect(r.x, r.y, r.width, r.height);
+                                }
+                                @Override protected void paintThumb(Graphics g, JComponent c, java.awt.Rectangle r) {
+                                    if (r.isEmpty()) return;
+                                    Graphics2D g2 = (Graphics2D) g.create();
+                                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                            RenderingHints.VALUE_ANTIALIAS_ON);
+                                    g2.setColor(new Color(96, 216, 164, 160));
+                                    g2.fillRoundRect(r.x + 1, r.y + 2, r.width - 2, r.height - 4, 4, 4);
+                                    g2.dispose();
+                                }
+                            });
+                            break;
+                        }
+                        parent = parent.getParent();
+                    }
+                }
             }
         });
 
         return box;
     }
 
+    // =========================================================================
+    // main — for standalone testing
+    // =========================================================================
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             JFrame f = new JFrame("Member Info — View/Edit");
             f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            f.setSize(1100, 750); f.add(new MemberInfoFormView());
-            f.setLocationRelativeTo(null); f.setVisible(true);
+            f.setSize(1100, 750);
+            f.add(new MemberInfoFormView());
+            f.setLocationRelativeTo(null);
+            f.setVisible(true);
         });
     }
 }
