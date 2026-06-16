@@ -1,9 +1,12 @@
 package dao;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
 import database.DatabaseConnection;
 import models.CurrentEmpRecordTable;
-
-import java.sql.*;
 
 public class CurrentEmpDAO {
 	
@@ -108,4 +111,7 @@ public class CurrentEmpDAO {
                 rs.getDate("Date_Employed")
         );
     }
+    
+ // ─── UPDATE ───────────────────────────────────────────────────────────────
+    
 }

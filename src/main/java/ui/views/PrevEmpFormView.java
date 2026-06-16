@@ -1,26 +1,66 @@
 package ui.views;
 
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.Window;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicScrollBarUI;
+
 import dao.CompanyDAO;
 import dao.PrevEmpDAO;
 import models.CompanyDetailsTable;
 import models.PrevEmpTable;
 import ui.frames.SignInFrame;
 
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
-import java.awt.event.FocusAdapter;
-import java.awt.event.FocusEvent;
-import java.util.ArrayList;
-import java.util.List;
-
 public class PrevEmpFormView extends JPanel {
 
-    private final Color darkBg1     = new Color(10, 22, 40);
-    private final Color darkBg2     = new Color(21, 101, 192);
-    private final Color accentGreen = new Color(96, 216, 164);
-    private final Color accentRed   = new Color(255, 99, 132);
-    private final Color textWhite   = Color.WHITE;
+    private final Color darkBg1          = new Color(10, 22, 40);
+    private final Color darkBg2          = new Color(21, 101, 192);
+    private final Color accentGreen      = new Color(96, 216, 164);
+    private final Color accentRed        = new Color(255, 99, 132);
+    private final Color textWhite        = Color.WHITE;
+
+    // Scrollbar colours — same as MemberInfoFormView
+    private final Color scrollTrack      = new Color(255, 255, 255, 18);
+    private final Color scrollThumb      = new Color(96, 216, 164, 120);
+    private final Color scrollThumbHover = new Color(96, 216, 164, 200);
 
     private JButton  editSaveBtn;
     private boolean  editMode = false;
@@ -98,37 +138,26 @@ public class PrevEmpFormView extends JPanel {
         subHeading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         // ── List Panel ────────────────────────────────────────────────────────
-        listPanel = new JPanel() {
-            @Override public boolean getScrollableTracksViewportWidth() {
-                return true; // let the list panel resize to the viewport width
-            }
-        };
+        listPanel = new JPanel();
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
         listPanel.setOpaque(false);
         listPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        // Leave a little room on the right so content isn't crowded by the scrollbar
         listPanel.setBorder(new EmptyBorder(0, 0, 0, 10));
 
-        // ── Scroll Pane wrapping the list ────────────────────────────────────
-        JScrollPane scrollPane = new JScrollPane(listPanel);
-        scrollPane.setOpaque(false);
-        scrollPane.getViewport().setOpaque(false);
-        scrollPane.setBorder(null);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        // ── Styled Scroll Pane ────────────────────────────────────────────────
+        JScrollPane scrollPane = buildScrollPane(listPanel);
         scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
-        scrollPane.setPreferredSize(new Dimension(10, 10)); // small base; BoxLayout will stretch it to fill content width
+        scrollPane.setPreferredSize(new Dimension(10, 10));
         scrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
 
         // ── Buttons ───────────────────────────────────────────────────────────
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
         buttonPanel.setOpaque(false);
 
-        JButton deleteBtn = buildButton("Delete All",  new Color(200, 50, 50));
-        JButton returnBtn = buildButton("Back",        accentRed);
-        JButton addBtn    = buildButton("Add Previous Employer", new Color(96, 216, 164));
-        editSaveBtn       = buildButton("Edit",        new Color(251, 191, 36));
+        JButton deleteBtn = buildButton("Delete All",            new Color(200, 50, 50));
+        JButton returnBtn = buildButton("Back",                  accentRed);
+        JButton addBtn    = buildButton("Add Previous Employer", accentGreen);
+        editSaveBtn       = buildButton("Edit",                  new Color(251, 191, 36));
 
         returnBtn.addActionListener(e -> {
             Window window = SwingUtilities.getWindowAncestor(PrevEmpFormView.this);
@@ -206,6 +235,73 @@ public class PrevEmpFormView extends JPanel {
         loadFromDatabase();
     }
 
+    // =========================================================================
+    // Styled Scroll Pane — glass-style, thin accent-green thumb
+    // =========================================================================
+    private JScrollPane buildScrollPane(JPanel content) {
+        JScrollPane scroll = new JScrollPane(content);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.setBorder(null);
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+
+        scroll.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
+
+            @Override
+            protected void configureScrollBarColors() {
+                thumbColor = scrollThumb;
+                trackColor = scrollTrack;
+            }
+
+            @Override
+            public Dimension getPreferredSize(JComponent c) {
+                return new Dimension(6, super.getPreferredSize(c).height);
+            }
+
+            @Override
+            protected JButton createDecreaseButton(int orientation) { return invisibleBtn(); }
+            @Override
+            protected JButton createIncreaseButton(int orientation) { return invisibleBtn(); }
+
+            private JButton invisibleBtn() {
+                JButton b = new JButton();
+                b.setPreferredSize(new Dimension(0, 0));
+                b.setMinimumSize(new Dimension(0, 0));
+                b.setMaximumSize(new Dimension(0, 0));
+                b.setVisible(false);
+                return b;
+            }
+
+            @Override
+            protected void paintTrack(Graphics g, JComponent c, java.awt.Rectangle trackBounds) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(scrollTrack);
+                g2.fillRoundRect(trackBounds.x + 1, trackBounds.y,
+                        trackBounds.width - 2, trackBounds.height, 6, 6);
+                g2.dispose();
+            }
+
+            @Override
+            protected void paintThumb(Graphics g, JComponent c, java.awt.Rectangle thumbBounds) {
+                if (thumbBounds.isEmpty()) return;
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(isThumbRollover() ? scrollThumbHover : scrollThumb);
+                g2.fillRoundRect(thumbBounds.x + 1, thumbBounds.y + 2,
+                        thumbBounds.width - 2, thumbBounds.height - 4, 6, 6);
+                g2.dispose();
+            }
+        });
+
+        scroll.getVerticalScrollBar().setOpaque(false);
+        scroll.getVerticalScrollBar().setBackground(new Color(0, 0, 0, 0));
+
+        return scroll;
+    }
+
     // ── Remove a single entry ─────────────────────────────────────────────────
     public void removeEntry(PrevEmpEntry entry) {
         int choice = JOptionPane.showConfirmDialog(this,
@@ -213,27 +309,23 @@ public class PrevEmpFormView extends JPanel {
             "Confirm Remove", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (choice != JOptionPane.YES_OPTION) return;
 
-        // Use existing deletePrevEmp(int) from PrevEmpDAO
         if (entry.prevEmpCode > 0) {
             new PrevEmpDAO().deletePrevEmp(entry.prevEmpCode);
         }
 
-        // Remove from entries list
         entries.remove(entry);
 
-        // Remove the entry panel and its spacer from listPanel
         Component[] comps = listPanel.getComponents();
         for (int i = 0; i < comps.length; i++) {
             if (comps[i] == entry) {
                 listPanel.remove(i);
                 if (i < listPanel.getComponentCount()) {
-                    listPanel.remove(i); // remove spacer after it
+                    listPanel.remove(i);
                 }
                 break;
             }
         }
 
-        // Renumber remaining entries
         for (int i = 0; i < entries.size(); i++) {
             entries.get(i).updateNumber(i + 1);
         }
@@ -355,7 +447,7 @@ public class PrevEmpFormView extends JPanel {
             addEntry(i + 1, loggedInMID, companyDisplay,
                 rec.getFromDate() != null ? rec.getFromDate().toString() : "",
                 rec.getToDate()   != null ? rec.getToDate().toString()   : "",
-                rec.getPrevEmpCode()); // ← correct getter from PrevEmpTable
+                rec.getPrevEmpCode());
         }
 
         lockAllEntries();
@@ -371,13 +463,15 @@ public class PrevEmpFormView extends JPanel {
         listPanel.repaint();
     }
 
-    // ── Entry Card ────────────────────────────────────────────────────────────
+    // =========================================================================
+    // Entry Card
+    // =========================================================================
     public class PrevEmpEntry extends JPanel {
 
         private JLabel           numberLabel;
         private JButton          removeBtn;
 
-        public int               prevEmpCode; // matches PrevEmpTable.getPrevEmpCode()
+        public int               prevEmpCode;
         public JTextField        pagIbigMidNoField;
         public JComboBox<String> companyBox;
         public JTextField        fromDateField;
@@ -423,7 +517,7 @@ public class PrevEmpFormView extends JPanel {
             removeBtn.setContentAreaFilled(false);
             removeBtn.setFocusPainted(false);
             removeBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            removeBtn.setVisible(false); // hidden until Edit is clicked
+            removeBtn.setVisible(false);
             removeBtn.addActionListener(e -> parent.removeEntry(this));
 
             header.add(numberLabel, BorderLayout.WEST);
@@ -439,11 +533,8 @@ public class PrevEmpFormView extends JPanel {
             JPanel r1 = row(2);
             r1.add(fieldPanel("PAG-IBIG MID NO.", pagIbigMidNoField = buildTextField(mid)));
 
-            companyBox = new JComboBox<>(buildCompanyItems());
-            companyBox.setFont(new Font("Arial", Font.PLAIN, 14));
-            companyBox.setForeground(Color.WHITE);
-            companyBox.setBackground(new Color(25, 35, 60));
-            companyBox.setPrototypeDisplayValue("Select"); // prevent long company names from widening the layout
+            companyBox = buildComboBox(buildCompanyItems());
+            companyBox.setPrototypeDisplayValue("Select");
             companyBox.setEnabled(false);
 
             for (int i = 0; i < companyBox.getItemCount(); i++) {
@@ -473,6 +564,174 @@ public class PrevEmpFormView extends JPanel {
         public void setRemoveBtnVisible(boolean visible) {
             removeBtn.setVisible(visible);
         }
+    }
+
+    // =========================================================================
+    // Glass-style Combo Box — matching MemberInfoFormView
+    // =========================================================================
+    private JComboBox<String> buildComboBox(String[] items) {
+        JComboBox<String> box = new JComboBox<String>(items) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                if (isEnabled()) {
+                    // Edit mode: glass fill + solid accent-green border
+                    g2.setColor(new Color(255, 255, 255, 14));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                    g2.setStroke(new BasicStroke(1.5f));
+                    g2.setColor(new Color(96, 216, 164, 160));
+                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                } else {
+                    // Read-only: near-invisible fill + dashed subtle border
+                    g2.setColor(new Color(255, 255, 255, 6));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                    g2.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT,
+                            BasicStroke.JOIN_MITER, 1f, new float[]{4f, 3f}, 0f));
+                    g2.setColor(new Color(255, 255, 255, 45));
+                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                }
+
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+
+        box.setOpaque(false);
+        box.setBackground(new Color(0, 0, 0, 0));
+        box.setForeground(new Color(225, 225, 225));
+        box.setFont(new Font("Arial", Font.PLAIN, 14));
+        box.setBorder(new EmptyBorder(8, 12, 8, 8));
+        box.setFocusable(true);
+
+        // Force internal editor text color
+        SwingUtilities.invokeLater(() -> {
+            Component editor = box.getEditor().getEditorComponent();
+            if (editor instanceof JTextField) {
+                JTextField tf = (JTextField) editor;
+                tf.setForeground(new Color(225, 225, 225));
+                tf.setBackground(new Color(0, 0, 0, 0));
+                tf.setOpaque(false);
+                tf.setBorder(new EmptyBorder(0, 0, 0, 0));
+            }
+        });
+
+        // Sync text color and arrow visibility with enabled state
+        box.addPropertyChangeListener("enabled", new PropertyChangeListener() {
+            public void propertyChange(PropertyChangeEvent evt) {
+                boolean enabled = Boolean.TRUE.equals(evt.getNewValue());
+                Component editor = box.getEditor().getEditorComponent();
+                if (editor instanceof JTextField) {
+                    ((JTextField) editor).setForeground(
+                        enabled ? new Color(225, 225, 225) : new Color(160, 185, 210));
+                }
+                for (Component comp : box.getComponents()) {
+                    if (comp instanceof JButton) {
+                        comp.setVisible(enabled);
+                    }
+                }
+                box.repaint();
+            }
+        });
+
+        // Arrow button — transparent, hidden when read-only
+        for (Component comp : box.getComponents()) {
+            if (comp instanceof JButton) {
+                JButton arrowBtn = (JButton) comp;
+                arrowBtn.setOpaque(false);
+                arrowBtn.setContentAreaFilled(false);
+                arrowBtn.setBorderPainted(false);
+                arrowBtn.setForeground(accentGreen);
+            }
+        }
+
+        // Renderer: muted (locked) vs bright (editable)
+        box.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value,
+                    int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+                boolean enabled = box.isEnabled();
+
+                if (index == -1) {
+                    setOpaque(false);
+                    setBackground(new Color(0, 0, 0, 0));
+                    setForeground(enabled
+                        ? new Color(225, 225, 225)
+                        : new Color(160, 185, 210));
+                    setFont(new Font("Arial", Font.PLAIN, 14));
+                    setBorder(new EmptyBorder(0, 0, 0, 0));
+                } else {
+                    if (isSelected) {
+                        setBackground(new Color(21, 101, 192));
+                        setForeground(Color.WHITE);
+                    } else {
+                        setBackground(new Color(13, 32, 64));
+                        setForeground(new Color(210, 220, 235));
+                    }
+                    setOpaque(true);
+                    setFont(new Font("Arial", Font.PLAIN, 14));
+                    setBorder(new EmptyBorder(7, 12, 7, 12));
+                }
+
+                return this;
+            }
+        });
+
+        // Dark popup list with accent-green scrollbar
+        SwingUtilities.invokeLater(() -> {
+            Object popup = box.getUI().getAccessibleChild(box, 0);
+            if (popup instanceof javax.swing.plaf.basic.ComboPopup) {
+                javax.swing.plaf.basic.ComboPopup cp =
+                        (javax.swing.plaf.basic.ComboPopup) popup;
+                JList<?> list = cp.getList();
+                list.setBackground(new Color(13, 32, 64));
+                list.setForeground(new Color(210, 220, 235));
+                list.setBorder(new EmptyBorder(4, 0, 4, 0));
+
+                Component parent = list.getParent();
+                while (parent != null) {
+                    if (parent instanceof JScrollPane) {
+                        JScrollPane sp = (JScrollPane) parent;
+                        sp.setBorder(BorderFactory.createLineBorder(
+                                new Color(96, 216, 164, 100), 1));
+                        sp.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
+                            @Override protected void configureScrollBarColors() {
+                                thumbColor = new Color(96, 216, 164, 140);
+                                trackColor = new Color(10, 22, 40, 200);
+                            }
+                            @Override protected JButton createDecreaseButton(int o) { return zeroBtn(); }
+                            @Override protected JButton createIncreaseButton(int o) { return zeroBtn(); }
+                            private JButton zeroBtn() {
+                                JButton b = new JButton();
+                                b.setPreferredSize(new Dimension(0, 0));
+                                b.setVisible(false);
+                                return b;
+                            }
+                            @Override protected void paintTrack(Graphics g, JComponent c, java.awt.Rectangle r) {
+                                g.setColor(new Color(10, 22, 40, 180));
+                                g.fillRect(r.x, r.y, r.width, r.height);
+                            }
+                            @Override protected void paintThumb(Graphics g, JComponent c, java.awt.Rectangle r) {
+                                if (r.isEmpty()) return;
+                                Graphics2D g2 = (Graphics2D) g.create();
+                                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                        RenderingHints.VALUE_ANTIALIAS_ON);
+                                g2.setColor(new Color(96, 216, 164, 160));
+                                g2.fillRoundRect(r.x + 1, r.y + 2, r.width - 2, r.height - 4, 4, 4);
+                                g2.dispose();
+                            }
+                        });
+                        break;
+                    }
+                    parent = parent.getParent();
+                }
+            }
+        });
+
+        return box;
     }
 
     // ── UI Helpers ────────────────────────────────────────────────────────────

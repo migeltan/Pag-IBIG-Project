@@ -1,17 +1,51 @@
 package ui.forms;
 
-import dao.*;
-import models.*;
-import ui.frames.SignInFrame;
-
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
+import java.awt.RenderingHints;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+
+import dao.CompanyDAO;
+import dao.CurrentEmpDAO;
+import dao.HeirsDAO;
+import dao.MemberDAO;
+import dao.PrevEmpDAO;
+import models.CompanyDetailsTable;
+import models.CurrentEmpRecordTable;
+import models.HeirsTable;
+import models.MemberTable;
+import models.PrevEmpTable;
+import ui.frames.SignInFrame;
 
 public class MemberRecordForm extends JFrame {
 
