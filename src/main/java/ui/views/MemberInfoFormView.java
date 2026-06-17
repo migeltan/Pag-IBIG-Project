@@ -284,31 +284,27 @@ public class MemberInfoFormView extends JPanel {
         try { birthdate = Date.valueOf(birthdateField.getText().trim()); }
         catch (IllegalArgumentException ex) { showError("Birthdate must be YYYY-MM-DD."); return; }
 
-        String membershipType = (String) membershipTypeBox.getSelectedItem();
-        String membershipTypeOthers = null;
-        if ("Others".equals(membershipType)) {
-            membershipTypeOthers = membershipTypeOthersField.getText().trim();
-            membershipType = "EMPLOYED";
+        String membershipType;
+        if ("Others".equals(membershipTypeBox.getSelectedItem())) {
+            membershipType = membershipTypeOthersField.getText().trim();
         } else {
-            membershipType = toMembershipTypeEnum(membershipType);
+            membershipType = toMembershipTypeEnum((String) membershipTypeBox.getSelectedItem());
         }
 
-        String membershipCategory = (String) membershipCategoryBox.getSelectedItem();
-        String membershipCategoryOthers = null;
-        if ("Others".equals(membershipCategory)) {
-            membershipCategoryOthers = membershipCategoryOthersField.getText().trim();
-            membershipCategory = "OTHER EARNING GROUPS";
+        String membershipCategory;
+        if ("Others".equals(membershipCategoryBox.getSelectedItem())) {
+            membershipCategory = membershipCategoryOthersField.getText().trim();
         } else {
-            membershipCategory = toMembershipCategoryEnum(membershipCategory);
+            membershipCategory = toMembershipCategoryEnum((String) membershipCategoryBox.getSelectedItem());
         }
 
         MemberTable m = new MemberTable();
         m.setPagIbigMIDNo(loggedInMID);
         m.setOccupationalStatus(toDbOccupational((String) occupationalStatusBox.getSelectedItem()));
         m.setMembershipType(membershipType);
-        m.setMembershipTypeOthers(membershipTypeOthers);
+        //m.setMembershipTypeOthers(membershipTypeOthers);
         m.setMembershipCategory(membershipCategory);
-        m.setMembershipCategoryOthers(membershipCategoryOthers);
+        //m.setMembershipCategoryOthers(membershipCategoryOthers);
         m.setMemberName(memberNameField.getText().trim());
         m.setFatherName(fatherNameField.getText().trim());
         m.setMotherName(motherNameField.getText().trim());
@@ -361,7 +357,7 @@ public class MemberInfoFormView extends JPanel {
 
         pagIbigMidNoField.setText(safe(m.getPagIbigMIDNo()));
 
-        String dbType = safe(m.getMembershipType());
+            String dbType = safe(m.getMembershipType());
         boolean typeMatched = false;
         for (int i = 0; i < membershipTypeBox.getItemCount(); i++) {
             if (membershipTypeBox.getItemAt(i).equalsIgnoreCase(dbType)) {
@@ -372,12 +368,6 @@ public class MemberInfoFormView extends JPanel {
             membershipTypeBox.setSelectedItem("Others");
             membershipTypeOthersField.setText(dbType);
             membershipTypeOthersPanel.setVisible(true);
-        } else {
-            String othersVal = safe(m.getMembershipTypeOthers());
-            if (!othersVal.isEmpty()) {
-                membershipTypeOthersField.setText(othersVal);
-                membershipTypeOthersPanel.setVisible(true);
-            }
         }
 
         String dbCategory = safe(m.getMembershipCategory());
@@ -391,12 +381,6 @@ public class MemberInfoFormView extends JPanel {
             membershipCategoryBox.setSelectedItem("Others");
             membershipCategoryOthersField.setText(dbCategory);
             membershipCategoryOthersPanel.setVisible(true);
-        } else {
-            String othersVal = safe(m.getMembershipCategoryOthers());
-            if (!othersVal.isEmpty()) {
-                membershipCategoryOthersField.setText(othersVal);
-                membershipCategoryOthersPanel.setVisible(true);
-            }
         }
 
         setCombo(occupationalStatusBox,           m.getOccupationalStatus());

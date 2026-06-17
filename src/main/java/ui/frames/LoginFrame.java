@@ -1,15 +1,41 @@
 package ui.frames;
 
-import dao.UserCredentialsDAO;
-
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Image;
+import java.awt.Insets;
+import java.awt.RenderingHints;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.geom.RoundRectangle2D;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+
+import dao.UserCredentialsDAO;
 
 public class LoginFrame extends JFrame {
 
@@ -275,6 +301,23 @@ public class LoginFrame extends JFrame {
         leftPanel.add(optionsRow);
         leftPanel.add(Box.createRigidArea(new Dimension(0, 20)));
         leftPanel.add(signInBtn);
+
+        leftPanel.add(Box.createRigidArea(new Dimension(0, 15)));
+
+        JButton adminAccessBtn = new JButton("Admin Access →");
+        adminAccessBtn.setContentAreaFilled(false);
+        adminAccessBtn.setBorderPainted(false);
+        adminAccessBtn.setFocusPainted(false);
+        adminAccessBtn.setForeground(textMuted);
+        adminAccessBtn.setFont(new Font("Arial", Font.PLAIN, 11));
+        adminAccessBtn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        adminAccessBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+        adminAccessBtn.addActionListener(e -> {
+            new AdminLoginFrame();
+            dispose();
+        });
+
+        leftPanel.add(adminAccessBtn);
 
         GradientPanel rightPanel = new GradientPanel(primaryBlue, darkBlue) {
             @Override

@@ -113,5 +113,20 @@ public class CurrentEmpDAO {
     }
     
  // ─── UPDATE ───────────────────────────────────────────────────────────────
-    
+    // Alias so AdminDashboard can call getByMID()
+    public CurrentEmpRecordTable getByMID(String pagIbigMIDNo) {
+        return getCurrentEmpByMID(pagIbigMIDNo);
+    }
+
+    public boolean deleteByMID(String pagIbigMIDNo) {
+        String sql = "DELETE FROM currentemprecordtable WHERE PagIbig_MID_No = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, pagIbigMIDNo);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("[CurrentEmpDAO] deleteByMID error: " + e.getMessage());
+            return false;
+        }
+    }
 }
