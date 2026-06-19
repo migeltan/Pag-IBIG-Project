@@ -1,20 +1,35 @@
 package ui.utils;
 
-import javax.swing.*;
+import java.awt.BasicStroke;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridBagLayout;
+import java.awt.RenderingHints;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
+import java.security.MessageDigest;
+
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 
 import dao.UserCredentialsDAO;
 import models.UserCredentials;
 import ui.frames.SignInFrame;
-
-import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
-import java.awt.geom.RoundRectangle2D;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 public class SetUpPassword extends JFrame {
 
@@ -280,7 +295,8 @@ public class SetUpPassword extends JFrame {
 
         // ── Save hashed password to usercredentials table ────────────────────
         if (mid != null && !mid.isEmpty()) {
-            String hashed = hashPassword(pass);
+            // REPLACE WITH:
+        String hashed = pass;
             UserCredentials uc = new UserCredentials(
                     mid, hashed,
                     "", "",   // Security_Q1 / A1 — set up later via Settings

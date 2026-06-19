@@ -1,11 +1,15 @@
 package dao;
 
-import database.DatabaseConnection;
-import models.CompanyDetailsTable;
-
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+
+import database.DatabaseConnection;
+import models.CompanyDetailsTable;
 
 public class CompanyDAO {
 
@@ -71,6 +75,36 @@ public class CompanyDAO {
                 rs.getString("Office_Assignment"),
                 rs.getString("Branch_Location")
         );
+    }
+    public boolean updateCompany(CompanyDetailsTable company) {
+    String sql = "UPDATE companydetailstable SET "
+            + "Company_Name = ?, Company_Address = ?, "
+            + "Office_Assignment = ?, Branch_Location = ? "
+            + "WHERE Company_Code = ?";
+    try (Connection conn = DatabaseConnection.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setString(1, company.getCompanyName());
+        ps.setString(2, company.getCompanyAddress());
+        ps.setString(3, company.getOfficeAssignment());
+        ps.setString(4, company.getBranchLocation());
+        ps.setString(5, company.getCompanyCode());
+        return ps.executeUpdate() > 0;
+    } catch (SQLException e) {
+        System.err.println("[CompanyDAO] updateCompany error: " + e.getMessage());
+        return false;
+    }
+}
+
+    public boolean deleteCompany(String companyCode) {
+        String sql = "DELETE FROM companydetailstable WHERE Company_Code = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+            PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, companyCode);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("[CompanyDAO] deleteCompany error: " + e.getMessage());
+            return false;
+        }
     }
 }
 

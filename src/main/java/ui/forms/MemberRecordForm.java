@@ -1,17 +1,52 @@
 package ui.forms;
 
-import dao.*;
-import models.*;
-import ui.frames.SignInFrame;
-
-import javax.swing.*;
-import javax.swing.border.*;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GradientPaint;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
+import java.awt.RenderingHints;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
+
+import dao.CompanyDAO;
+import dao.CurrentEmpDAO;
+import dao.HeirsDAO;
+import dao.MemberDAO;
+import dao.PrevEmpDAO;
+import models.CompanyDetailsTable;
+import models.CurrentEmpRecordTable;
+import models.HeirsTable;
+import models.MemberTable;
+import models.PrevEmpTable;
+import ui.frames.SignInFrame;
+
 
 public class MemberRecordForm extends JFrame {
 
@@ -50,6 +85,8 @@ public class MemberRecordForm extends JFrame {
     private JPanel heirListPanel;
     private int    heirCount = 0;
     private final List<HeirEntryPanel> heirEntries = new ArrayList<>();
+
+    private JPanel membershipTypeOthersPanel;
 
     public MemberRecordForm(JFrame caller, String loggedInMID) {
         this.caller      = caller;
@@ -258,7 +295,20 @@ public class MemberRecordForm extends JFrame {
         if (m != null) {
             pagIbigMidNoField.setText(safe(m.getPagIbigMIDNo()));
             setCombo(membershipTypeBox,      m.getMembershipType());
-            membershipTypeOthersField.setText(safe(m.getMembershipTypeOthers()));
+            // If the DB value doesn't match any combo option, it was a custom "Others" value
+            String dbType = safe(m.getMembershipType());
+            boolean typeMatched = false;
+            for (int i = 0; i < membershipTypeBox.getItemCount(); i++) {
+                if (membershipTypeBox.getItemAt(i).equalsIgnoreCase(dbType)) {
+                    typeMatched = true; break;
+                }
+            }
+            if (!typeMatched && !dbType.isEmpty()) {
+                membershipTypeBox.setSelectedItem("Others");
+                membershipTypeOthersField.setText(dbType);
+                membershipTypeOthersPanel.setVisible(true); // ← won't work — see note below
+            }
+            //membershipTypeOthersField.setText(safe(m.getMembershipTypeOthers()));
             setCombo(membershipCategoryBox,  m.getMembershipCategory());
             setCombo(occupationalStatusBox,  m.getOccupationalStatus());
             setCombo(frequencyBox,           m.getFrequencyOfMembershipSavings());
@@ -344,7 +394,10 @@ public class MemberRecordForm extends JFrame {
         MemberTable m = new MemberTable();
         m.setPagIbigMIDNo(loggedInMID);
         m.setMembershipType(toMembershipTypeEnum((String) membershipTypeBox.getSelectedItem()));
-        m.setMembershipTypeOthers(membershipTypeOthersField.getText().trim());
+        String mType = "Others".equals(membershipTypeBox.getSelectedItem())
+            ? membershipTypeOthersField.getText().trim()
+            : toMembershipTypeEnum((String) membershipTypeBox.getSelectedItem());
+        m.setMembershipType(mType);
         m.setMembershipCategory(toMembershipCategoryEnum((String) membershipCategoryBox.getSelectedItem()));
         m.setOccupationalStatus(toDbOccupational((String) occupationalStatusBox.getSelectedItem()));
         m.setFrequencyOfMembershipSavings((String) frequencyBox.getSelectedItem());
@@ -478,13 +531,30 @@ public class MemberRecordForm extends JFrame {
         c.setBorder(new EmptyBorder(20, 0, 20, 0));
 
         c.add(sectionHeader("Membership Information")); c.add(vgap(14));
-        JPanel r1 = row(3);
-        r1.add(lf("Pag-IBIG MID No.",        pagIbigMidNoField        = tf("")));
-        r1.add(lf("Membership Type",          membershipTypeBox        = cb(new String[]{
+        // AFTER — Others field hidden by default, shown only when "Others" is selected
+        JPanel r1 = row(2);
+        r1.add(lf("Pag-IBIG MID No.", pagIbigMidNoField = tf("")));
+        r1.add(lf("Membership Type",  membershipTypeBox  = cb(new String[]{
                 "Select","Employed","Overseas Filipino Worker","Self-Employed","Others"})));
-        r1.add(lf("Membership Type (Others)", membershipTypeOthersField = tf("")));
         pagIbigMidNoField.setEditable(false);
-        c.add(r1); c.add(vgap(16));
+        c.add(r1); c.add(vgap(8));
+
+        // Others panel — hidden by default
+        membershipTypeOthersField = tf("");
+        membershipTypeOthersPanel = new JPanel(new GridLayout(1, 1, 0, 0));
+        membershipTypeOthersPanel.setOpaque(false);
+        membershipTypeOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+        membershipTypeOthersPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        membershipTypeOthersPanel.add(lf("Membership Type — please specify", membershipTypeOthersField));
+        membershipTypeOthersPanel.setVisible(false);
+        c.add(membershipTypeOthersPanel); c.add(vgap(8));
+
+        // Listener to show/hide
+        membershipTypeBox.addActionListener(e -> {
+            boolean show = "Others".equals(membershipTypeBox.getSelectedItem());
+            membershipTypeOthersPanel.setVisible(show);
+            c.revalidate(); c.repaint();
+        });
 
         JPanel r2 = row(2);
         r2.add(lf("Membership Category", membershipCategoryBox = cb(new String[]{

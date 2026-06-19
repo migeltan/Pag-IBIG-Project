@@ -1,6 +1,6 @@
 package ui.views;
 
-import dao.CompanyDAO;
+import dao.CompanyDAO;	
 import dao.CurrentEmpDAO;
 import models.CompanyDetailsTable;
 import models.CurrentEmpRecordTable;
@@ -8,11 +8,18 @@ import ui.frames.SignInFrame;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeEvent;
 import java.sql.Date;
 import java.util.List;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 public class CurrentEmpFormView extends JPanel {
 
@@ -53,7 +60,7 @@ public class CurrentEmpFormView extends JPanel {
                 g2.fillRect(0, 0, getWidth(), getHeight());
             }
         };
-        bg.setLayout(new GridBagLayout());
+        bg.setLayout(new BorderLayout());
 
         JPanel card = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -72,7 +79,6 @@ public class CurrentEmpFormView extends JPanel {
             }
         };
         card.setOpaque(false);
-        card.setPreferredSize(new Dimension(920, 520));
         card.setLayout(new BorderLayout());
         card.setBorder(new EmptyBorder(40, 45, 35, 45));
 
@@ -84,13 +90,17 @@ public class CurrentEmpFormView extends JPanel {
         JLabel heading = new JLabel("Current Employment Record");
         heading.setFont(new Font("Arial Black", Font.BOLD, 24));
         heading.setForeground(textWhite);
+        heading.setAlignmentX(Component.LEFT_ALIGNMENT);
+
         JLabel subHeading = new JLabel("View and manage your current employment information.");
         subHeading.setFont(new Font("Arial", Font.PLAIN, 13));
         subHeading.setForeground(new Color(255, 255, 255, 160));
+        subHeading.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JPanel titleBlock = new JPanel();
         titleBlock.setOpaque(false);
         titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
+        titleBlock.setAlignmentX(Component.LEFT_ALIGNMENT);
         titleBlock.add(heading);
         titleBlock.add(Box.createRigidArea(new Dimension(0, 6)));
         titleBlock.add(subHeading);
@@ -105,15 +115,98 @@ public class CurrentEmpFormView extends JPanel {
         pagIbigMidNoField.setText(loggedInMID != null ? loggedInMID : "");
         r1.add(fieldPanel("PAG-IBIG MID NO.", pagIbigMidNoField));
 
-        companyBox = new JComboBox<>(companyItems);
-        companyBox.setFont(new Font("Arial", Font.PLAIN, 14));
-        companyBox.setForeground(Color.WHITE);
-        companyBox.setBackground(new Color(25, 35, 60));
+        companyBox = buildComboBox(companyItems);
         r1.add(fieldPanel("COMPANY", companyBox));
 
         JPanel r2 = row(2);
-        r2.add(fieldPanel("OCCUPATION *",              occupationField   = buildTextField()));
+        r2.add(fieldPanel("OCCUPATION *",                 occupationField   = buildTextField()));
         r2.add(fieldPanel("DATE EMPLOYED (YYYY-MM-DD) *", dateEmployedField = buildTextField()));
+
+        // ── Auto-insert dashes + block non-digits ─────────────────────────────
+        ((AbstractDocument) dateEmployedField.getDocument()).setDocumentFilter(new DocumentFilter() {
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String string, AttributeSet attr)
+                    throws BadLocationException {
+                String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+
+                // Backspace: if the char just before cursor is a dash, eat the dash too
+                if (string.isEmpty() && length > 0) {
+                    if (offset > 0 && current.length() > offset - 1
+                            && current.charAt(offset - 1) == '-') {
+                        String withoutDash = current.substring(0, offset - 1)
+                                + current.substring(offset + length - (length > 0 ? 0 : 0));
+                        fb.replace(0, current.length(),
+                                withoutDash.substring(0, Math.max(0, offset - 1)), attr);
+                        return;
+                    }
+                    super.replace(fb, offset, length, string, attr);
+                    return;
+                }
+
+                // Only digits allowed
+                if (!string.matches("\\d*")) return;
+
+                // Rebuild raw digits and reformat
+                String currentRaw = current.replace("-", "");
+                String cursorRaw  = current.substring(0, offset).replace("-", "");
+                String newRaw     = cursorRaw + string + currentRaw.substring(cursorRaw.length());
+
+                if (newRaw.length() > 8) return;
+
+                String formatted = formatDate(newRaw);
+                fb.replace(0, current.length(), formatted, attr);
+
+                int newCursor = cursorRaw.length() + string.length();
+                if (newCursor >= 4) newCursor++;
+                if (newCursor >= 7) newCursor++;
+                final int pos = Math.min(newCursor, formatted.length());
+                SwingUtilities.invokeLater(() -> dateEmployedField.setCaretPosition(pos));
+            }
+
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr)
+                    throws BadLocationException {
+                replace(fb, offset, 0, string, attr);
+            }
+
+            private String formatDate(String digits) {
+                if (digits.length() <= 4) return digits;
+                if (digits.length() <= 6)
+                    return digits.substring(0, 4) + "-" + digits.substring(4);
+                return digits.substring(0, 4) + "-" + digits.substring(4, 6) + "-" + digits.substring(6);
+            }
+        });
+
+        // ── Space/Enter triggers leading-zero padding ──────────────────────────
+        dateEmployedField.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_SPACE
+                        || e.getKeyCode() == java.awt.event.KeyEvent.VK_ENTER) {
+                    e.consume();
+                    SwingUtilities.invokeLater(() -> applyDatePadAndFormat(dateEmployedField));
+                }
+            }
+        });
+
+        // ── Pad + validate on focus lost ───────────────────────────────────────
+        dateEmployedField.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                applyDatePadAndFormat(dateEmployedField);
+                String text = dateEmployedField.getText().trim();
+                if (text.isEmpty() || text.length() < 10) return;
+                String error = validateDate(text);
+                if (error != null) {
+                    showError(error);
+                    SwingUtilities.invokeLater(() -> {
+                        setDateTextDirect(dateEmployedField, "");
+                        dateEmployedField.requestFocusInWindow();
+                    });
+                }
+            }
+        });
 
         JPanel r3 = row(3);
         r3.add(fieldPanel("EMPLOYMENT STATUS *", employmentStatusBox = buildComboBox(new String[]{
@@ -128,8 +221,9 @@ public class CurrentEmpFormView extends JPanel {
         })));
 
         // ── Buttons ───────────────────────────────────────────────────────────
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
         buttonPanel.setOpaque(false);
+        buttonPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JButton returnBtn = buildButton("Back", accentRed);
         editSaveBtn       = buildButton("Edit", accentAmber);
@@ -164,7 +258,13 @@ public class CurrentEmpFormView extends JPanel {
         content.add(buttonPanel);
 
         card.add(content, BorderLayout.CENTER);
-        bg.add(card);
+
+        JPanel cardWrap = new JPanel(new BorderLayout());
+        cardWrap.setOpaque(false);
+        cardWrap.setBorder(new EmptyBorder(28, 28, 28, 28));
+        cardWrap.add(card, BorderLayout.CENTER);
+
+        bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
         if (loggedInMID != null && !loggedInMID.isEmpty()) {
@@ -191,7 +291,6 @@ public class CurrentEmpFormView extends JPanel {
         setComboByValue(typeOfWorkBox, record.getTypeOfWork());
         setComboByValue(countryOfAssignmentBox, record.getCountryOfAssignment());
 
-        // Set company dropdown by matching company code
         String code = record.getCompanyCode();
         for (int i = 0; i < companyBox.getItemCount(); i++) {
             String item = companyBox.getItemAt(i);
@@ -217,14 +316,14 @@ public class CurrentEmpFormView extends JPanel {
             showError("Please select a country of assignment."); return;
         }
 
-        Date dateEmployed;
-        try {
-            dateEmployed = Date.valueOf(dateEmployedField.getText().trim());
-        } catch (IllegalArgumentException ex) {
-            showError("Date must be in YYYY-MM-DD format."); return;
-        }
+        String dateText = dateEmployedField.getText().trim();
+        if (dateText.isEmpty()) { showError("Please enter the date employed."); return; }
+        String dateError = validateDate(dateText);
+        if (dateError != null) { showError(dateError); return; }
+        Date dateEmployed = Date.valueOf(dateText);
+        
+        
 
-        // Extract company code from selected item
         String selected = (String) companyBox.getSelectedItem();
         String companyCode = selected.substring(selected.lastIndexOf("(") + 1, selected.lastIndexOf(")"));
 
@@ -316,11 +415,273 @@ public class CurrentEmpFormView extends JPanel {
         return field;
     }
 
+    // ── Glass-style combo box — matching MemberInfoFormView design ─────────────
     private JComboBox<String> buildComboBox(String[] items) {
-        JComboBox<String> box = new JComboBox<>(items);
+        JComboBox<String> box = new JComboBox<String>(items) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                if (isEnabled()) {
+                    // Edit mode: glass fill + solid accent-green border
+                    g2.setColor(new Color(255, 255, 255, 14));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                    g2.setStroke(new BasicStroke(1.5f));
+                    g2.setColor(new Color(96, 216, 164, 160));
+                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                } else {
+                    // Read-only: near-invisible fill + dashed subtle border
+                    g2.setColor(new Color(255, 255, 255, 6));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                    g2.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_BUTT,
+                            BasicStroke.JOIN_MITER, 1f, new float[]{4f, 3f}, 0f));
+                    g2.setColor(new Color(255, 255, 255, 45));
+                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                }
+
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+
+        box.setOpaque(false);
+        box.setBackground(new Color(0, 0, 0, 0));
+        box.setForeground(new Color(225, 225, 225));
         box.setFont(new Font("Arial", Font.PLAIN, 14));
-        box.setForeground(Color.WHITE); box.setBackground(new Color(25, 35, 60));
-        box.setBorder(BorderFactory.createEmptyBorder()); return box;
+        box.setBorder(new EmptyBorder(8, 12, 8, 8));
+        box.setFocusable(true);
+
+        // Force the internal editor component to match text color
+        SwingUtilities.invokeLater(() -> {
+            Component editor = box.getEditor().getEditorComponent();
+            if (editor instanceof JTextField) {
+                JTextField tf = (JTextField) editor;
+                tf.setForeground(new Color(225, 225, 225));
+                tf.setBackground(new Color(0, 0, 0, 0));
+                tf.setOpaque(false);
+                tf.setBorder(new EmptyBorder(0, 0, 0, 0));
+            }
+        });
+
+        // Re-apply foreground color when enabled state changes
+        box.addPropertyChangeListener("enabled", new PropertyChangeListener() {
+            public void propertyChange(PropertyChangeEvent evt) {
+                boolean enabled = Boolean.TRUE.equals(evt.getNewValue());
+                Component editor = box.getEditor().getEditorComponent();
+                if (editor instanceof JTextField) {
+                    ((JTextField) editor).setForeground(
+                        enabled ? new Color(225, 225, 225) : new Color(160, 185, 210));
+                }
+                for (Component comp : box.getComponents()) {
+                    if (comp instanceof JButton) {
+                        comp.setVisible(enabled);
+                    }
+                }
+                box.repaint();
+            }
+        });
+
+        // Arrow button — transparent; hidden when read-only
+        for (Component comp : box.getComponents()) {
+            if (comp instanceof JButton) {
+                JButton arrowBtn = (JButton) comp;
+                arrowBtn.setOpaque(false);
+                arrowBtn.setContentAreaFilled(false);
+                arrowBtn.setBorderPainted(false);
+                arrowBtn.setForeground(accentGreen);
+            }
+        }
+
+        // Renderer: two visual states — locked (muted) vs editable (bright)
+        box.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value,
+                    int index, boolean isSelected, boolean cellHasFocus) {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+                boolean enabled = box.isEnabled();
+
+                if (index == -1) {
+                    // Selected value displayed inside the closed box
+                    setOpaque(false);
+                    setBackground(new Color(0, 0, 0, 0));
+                    if (enabled) {
+                        setForeground(new Color(225, 225, 225));
+                        setFont(new Font("Arial", Font.PLAIN, 14));
+                    } else {
+                        setForeground(new Color(160, 185, 210));
+                        setFont(new Font("Arial", Font.PLAIN, 14));
+                    }
+                    setBorder(new EmptyBorder(0, 0, 0, 0));
+                } else {
+                    // Dropdown list rows
+                    if (isSelected) {
+                        setBackground(new Color(21, 101, 192));
+                        setForeground(Color.WHITE);
+                    } else {
+                        setBackground(new Color(13, 32, 64));
+                        setForeground(new Color(210, 220, 235));
+                    }
+                    setOpaque(true);
+                    setFont(new Font("Arial", Font.PLAIN, 14));
+                    setBorder(new EmptyBorder(7, 12, 7, 12));
+                }
+
+                return this;
+            }
+        });
+
+        // Dark popup list styling with accent-green scrollbar
+        SwingUtilities.invokeLater(() -> {
+            Object popup = box.getUI().getAccessibleChild(box, 0);
+            if (popup instanceof javax.swing.plaf.basic.ComboPopup) {
+                javax.swing.plaf.basic.ComboPopup cp =
+                        (javax.swing.plaf.basic.ComboPopup) popup;
+                JList<?> list = cp.getList();
+                list.setBackground(new Color(13, 32, 64));
+                list.setForeground(new Color(210, 220, 235));
+                list.setBorder(new EmptyBorder(4, 0, 4, 0));
+
+                Component parent = list.getParent();
+                while (parent != null) {
+                    if (parent instanceof JScrollPane) {
+                        JScrollPane sp = (JScrollPane) parent;
+                        sp.setBorder(BorderFactory.createLineBorder(
+                                new Color(96, 216, 164, 100), 1));
+                        sp.getVerticalScrollBar().setUI(new BasicScrollBarUI() {
+                            @Override protected void configureScrollBarColors() {
+                                thumbColor = new Color(96, 216, 164, 140);
+                                trackColor = new Color(10, 22, 40, 200);
+                            }
+                            @Override protected JButton createDecreaseButton(int o) { return zeroBtn(); }
+                            @Override protected JButton createIncreaseButton(int o) { return zeroBtn(); }
+                            private JButton zeroBtn() {
+                                JButton b = new JButton();
+                                b.setPreferredSize(new Dimension(0, 0));
+                                b.setVisible(false);
+                                return b;
+                            }
+                            @Override protected void paintTrack(Graphics g, JComponent c, java.awt.Rectangle r) {
+                                g.setColor(new Color(10, 22, 40, 180));
+                                g.fillRect(r.x, r.y, r.width, r.height);
+                            }
+                            @Override protected void paintThumb(Graphics g, JComponent c, java.awt.Rectangle r) {
+                                if (r.isEmpty()) return;
+                                Graphics2D g2 = (Graphics2D) g.create();
+                                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                        RenderingHints.VALUE_ANTIALIAS_ON);
+                                g2.setColor(new Color(96, 216, 164, 160));
+                                g2.fillRoundRect(r.x + 1, r.y + 2, r.width - 2, r.height - 4, 4, 4);
+                                g2.dispose();
+                            }
+                        });
+                        break;
+                    }
+                    parent = parent.getParent();
+                }
+            }
+        });
+
+        return box;
+    }
+    
+ // ── Auto-pad month/day with a leading zero if single-digit ───────────────
+    private void applyDatePadAndFormat(JTextField f) {
+        String raw = f.getText().replaceAll("[^0-9]", "");
+        if (raw.isEmpty()) return;
+
+        String year = raw.length() >= 4 ? raw.substring(0, 4) : raw;
+        String rest = raw.length() >  4 ? raw.substring(4)    : "";
+
+        if (rest.length() == 1) {
+            rest = "0" + rest;
+        } else if (rest.length() == 3) {
+            if (rest.charAt(0) == '0') {
+                rest = rest.substring(0, 2) + "0" + rest.substring(2);
+            } else {
+                rest = "0" + rest;
+            }
+        }
+
+        String padded = year + rest;
+        StringBuilder formatted = new StringBuilder();
+        for (int i = 0; i < padded.length(); i++) {
+            if (i == 4 || i == 6) formatted.append("-");
+            formatted.append(padded.charAt(i));
+        }
+
+        if (!formatted.toString().equals(f.getText())) {
+            javax.swing.text.AbstractDocument doc =
+                    (javax.swing.text.AbstractDocument) f.getDocument();
+            javax.swing.text.DocumentFilter filter = doc.getDocumentFilter();
+            doc.setDocumentFilter(null);
+            f.setText(formatted.toString());
+            doc.setDocumentFilter(filter);
+            int len = f.getDocument().getLength();
+            f.setCaretPosition(Math.min(formatted.length(), len));
+        }
+    }
+
+    // ── Full date validation ──────────────────────────────────────────────────
+    private String validateDate(String dateStr) {
+        if (dateStr == null || !dateStr.matches("\\d{4}-\\d{2}-\\d{2}"))
+            return "Date must be in YYYY-MM-DD format.";
+
+        int year, month, day;
+        try {
+            year  = Integer.parseInt(dateStr.substring(0, 4));
+            month = Integer.parseInt(dateStr.substring(5, 7));
+            day   = Integer.parseInt(dateStr.substring(8, 10));
+        } catch (NumberFormatException e) {
+            return "Date must be in YYYY-MM-DD format.";
+        }
+
+        int currentYear = java.time.LocalDate.now().getYear();
+
+        if (year < 1900 || year > currentYear)
+            return "Year must be between 1900 and " + currentYear + ".";
+
+        if (month < 1 || month > 12)
+            return "Month must be between 01 and 12.";
+
+        final int maxDays;
+        switch (month) {
+            case 1: case 3: case 5: case 7:
+            case 8: case 10: case 12: maxDays = 31; break;
+            case 4: case 6: case 9: case 11: maxDays = 30; break;
+            case 2:
+                boolean isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+                maxDays = isLeap ? 29 : 28; break;
+            default: return "Month must be between 01 and 12.";
+        }
+
+        if (day < 1 || day > maxDays)
+            return "Day must be between 01 and " + maxDays
+                   + (month == 2 ? " for " + year + " (February)." : " for the selected month.");
+
+        try {
+            java.time.LocalDate entered = java.time.LocalDate.of(year, month, day);
+            if (entered.isAfter(java.time.LocalDate.now()))
+                return "Date Employed cannot be in the future.";
+        } catch (java.time.DateTimeException e) {
+            return "Invalid date. Please check the day, month, and year.";
+        }
+
+        return null; // valid
+    }
+
+    // ── Set date text bypassing the document filter ───────────────────────────
+    private void setDateTextDirect(JTextField field, String value) {
+        javax.swing.text.AbstractDocument doc =
+                (javax.swing.text.AbstractDocument) field.getDocument();
+        javax.swing.text.DocumentFilter existing = doc.getDocumentFilter();
+        try {
+            doc.setDocumentFilter(null);
+            field.setText(value);
+        } finally {
+            doc.setDocumentFilter(existing);
+        }
     }
 
     private JButton buildButton(String text, Color color) {
@@ -350,7 +711,9 @@ public class CurrentEmpFormView extends JPanel {
 
     private JPanel row(int cols) {
         JPanel p = new JPanel(new GridLayout(1, cols, 18, 0)); p.setOpaque(false);
-        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 75)); return p;
+        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 75));
+        p.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return p;
     }
 
     public static void main(String[] args) {

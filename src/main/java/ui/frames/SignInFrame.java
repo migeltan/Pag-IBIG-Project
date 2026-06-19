@@ -83,6 +83,7 @@ public class SignInFrame extends JFrame {
                     JOptionPane.WARNING_MESSAGE
             );
             if (choice == JOptionPane.YES_OPTION) {
+                main.RegistrationSession.reset();
                 new LoginFrame();
                 dispose();
             }
@@ -152,7 +153,7 @@ public class SignInFrame extends JFrame {
             }
         });
         editBtn.addActionListener(e -> {
-            new MemberRecordForm(SignInFrame.this).setVisible(true);
+            new MemberRecordForm(SignInFrame.this, loggedInMID).setVisible(true);
             SignInFrame.this.setVisible(false);
         });
 
@@ -181,7 +182,7 @@ public class SignInFrame extends JFrame {
             }
         });
         settingsBtn.addActionListener(e -> {
-            new SecurityQuestionsSetupFrame().setVisible(true);
+            new SecurityQuestionsSetupFrame(loggedInMID).setVisible(true);
             SignInFrame.this.dispose();
         });
 
@@ -329,7 +330,7 @@ public class SignInFrame extends JFrame {
             JFrame frame = new JFrame("Pag-CONNECT — Current Employment");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setSize(1100, 750);
-            frame.add(new CurrentEmpFormView());
+            frame.add(new CurrentEmpFormView(loggedInMID));
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
             SignInFrame.this.dispose();
@@ -339,7 +340,7 @@ public class SignInFrame extends JFrame {
             JFrame frame = new JFrame("Pag-CONNECT — Previous Employment");
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setSize(1100, 750);
-            frame.add(new PrevEmpFormView());
+            frame.add(new PrevEmpFormView(loggedInMID));
             frame.setLocationRelativeTo(null);
             frame.setVisible(true);
             SignInFrame.this.dispose();
