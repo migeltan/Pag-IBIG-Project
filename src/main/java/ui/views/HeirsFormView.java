@@ -301,8 +301,8 @@ public class HeirsFormView extends JPanel {
             entry.pagIbigMidNoField.setText(loggedInMid);
             entry.heirsNameField.setText(heir.getHeirsName());
             entry.heirsRelationshipBox.setSelectedItem(heir.getHeirsRelationship());
-            entry.heirsBirthdateField.setText(
-                heir.getHeirsBirthdate() != null ? heir.getHeirsBirthdate().toString() : "");
+            setDateTextDirect(entry.heirsBirthdateField,
+            	    heir.getHeirsBirthdate() != null ? heir.getHeirsBirthdate().toString() : "");
             entries.add(entry);
             listPanel.add(entry);
             listPanel.add(Box.createRigidArea(new Dimension(0, 14)));

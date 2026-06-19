@@ -399,7 +399,7 @@ public class MemberInfoFormView extends JPanel {
         fatherNameField.setText(  safe(m.getFatherName()));
         motherNameField.setText(  safe(m.getMotherName()));
         spouseNameField.setText(  safe(m.getSpouseName()));
-        birthdateField.setText(   m.getBirthdate() != null ? m.getBirthdate().toString() : "");
+        setDateTextDirect(birthdateField, m.getBirthdate() != null ? m.getBirthdate().toString() : "");
         birthplaceField.setText(  safe(m.getBirthplace()));
         setCombo(maritalStatusBox,  m.getMaritalStatus());
         setCombo(sexBox,            m.getSex());

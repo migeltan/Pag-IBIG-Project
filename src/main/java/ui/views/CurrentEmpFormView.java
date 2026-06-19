@@ -286,7 +286,8 @@ public class CurrentEmpFormView extends JPanel {
         }
 
         occupationField.setText(safe(record.getOccupation()));
-        dateEmployedField.setText(record.getDateEmployed() != null ? record.getDateEmployed().toString() : "");
+        setDateTextDirect(dateEmployedField,
+                record.getDateEmployed() != null ? record.getDateEmployed().toString() : "");
         setComboByValue(employmentStatusBox, record.getEmploymentStatus());
         setComboByValue(typeOfWorkBox, record.getTypeOfWork());
         setComboByValue(countryOfAssignmentBox, record.getCountryOfAssignment());
