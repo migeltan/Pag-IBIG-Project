@@ -410,21 +410,40 @@ public class HeirsFormView extends JPanel {
             }
         }
 
-        HeirsDAO dao = new HeirsDAO();
+       HeirsDAO dao = new HeirsDAO();
         dao.deleteAllHeirsByMID(loggedInMid);
+
+        boolean allSucceeded = true;
+        int failCount = 0;
         for (HeirEntry entry : entries) {
             String name         = entry.heirsNameField.getText().trim();
             String relationship = (String) entry.heirsRelationshipBox.getSelectedItem();
             String birthdate    = entry.heirsBirthdateField.getText().trim();
             java.sql.Date bd    = birthdate.isEmpty() ? null : java.sql.Date.valueOf(birthdate);
-            dao.insertHeir(new HeirsTable(loggedInMid, 0, name, relationship, bd));
+
+            boolean ok = dao.insertHeir(new HeirsTable(loggedInMid, 0, name, relationship, bd));
+            if (!ok) {
+                allSucceeded = false;
+                failCount++;
+            }
         }
 
-        JOptionPane.showMessageDialog(this, "Heirs and dependents saved successfully!",
-            "Success", JOptionPane.INFORMATION_MESSAGE);
+        if (allSucceeded) {
+            JOptionPane.showMessageDialog(this, "Heirs and dependents saved successfully!",
+                "Success", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this,
+                failCount + " of " + entries.size() + " heir record(s) failed to save.\n"
+                + "Check the console/log for the [HeirsDAO] insertHeir error details "
+                + "(common causes: a required column like Heirs_Birthdate doesn't allow NULL, "
+                + "or a data type mismatch).",
+                "Save Incomplete", JOptionPane.ERROR_MESSAGE);
+        }
+
         editMode = false;
         editSaveBtn.setText("Edit");
         lockAllEntries();
+        loadFromDatabase();
     }
 
     // =========================================================================

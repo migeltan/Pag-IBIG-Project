@@ -71,10 +71,28 @@ public class MemberRecordForm extends JFrame {
     public JComboBox<String> membershipTypeBox, membershipCategoryBox, occupationalStatusBox, frequencyBox;
     public JComboBox<String> preferredMailBox, maritalStatusBox, citizenshipBox, sexBox;
 
+    // "Other Earning Groups" free-text field — shown when that category is selected
+    public JTextField membershipCategoryOtherEarningField;
+    private JPanel    membershipCategoryOtherEarningPanel;
+
     // ── Current Employment fields ─────────────────────────────────────────────
     public JTextField curOccupationField, curDateEmpField;
     public JComboBox<String> curCompanyBox, curEmpStatusBox, curTypeOfWorkBox, curCountryBox;
     private List<CompanyDetailsTable> companyList;
+
+    // Country of Assignment free-text field — shown when "Other" is selected
+    private JTextField curCountryOthersField;
+    private JPanel     curCountryOthersPanel;
+
+    // Country of Assignment options — full list vs. OFW-only list (Philippines excluded)
+    private static final String[] COUNTRY_OPTIONS_ALL = {
+            "Select", "Philippines", "Saudi Arabia", "United Arab Emirates",
+            "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
+    };
+    private static final String[] COUNTRY_OPTIONS_OFW = {
+            "Select", "Saudi Arabia", "United Arab Emirates",
+            "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
+    };
 
     // ── Previous Employment ───────────────────────────────────────────────────
     private JPanel prevEmpListPanel;
@@ -294,22 +312,39 @@ public class MemberRecordForm extends JFrame {
         MemberTable m = new MemberDAO().getMemberById(loggedInMID);
         if (m != null) {
             pagIbigMidNoField.setText(safe(m.getPagIbigMIDNo()));
-            setCombo(membershipTypeBox,      m.getMembershipType());
-            // If the DB value doesn't match any combo option, it was a custom "Others" value
+
+            // ── Membership Type — value may be a recognized type or free-text "Others" ──
             String dbType = safe(m.getMembershipType());
-            boolean typeMatched = false;
-            for (int i = 0; i < membershipTypeBox.getItemCount(); i++) {
-                if (membershipTypeBox.getItemAt(i).equalsIgnoreCase(dbType)) {
-                    typeMatched = true; break;
+            if (!dbType.isEmpty()) {
+                String uiType = fromDbMembershipType(dbType);
+                if ("Others".equals(uiType)) {
+                    membershipTypeBox.setSelectedItem("Others");
+                    membershipTypeOthersField.setText(dbType);
+                    membershipTypeOthersPanel.setVisible(true);
+                } else {
+                    membershipTypeBox.setSelectedItem(uiType);
                 }
             }
-            if (!typeMatched && !dbType.isEmpty()) {
-                membershipTypeBox.setSelectedItem("Others");
-                membershipTypeOthersField.setText(dbType);
-                membershipTypeOthersPanel.setVisible(true); // ← won't work — see note below
+
+            // ── Membership Category — filtered list driven by Membership Type above ──
+            String dbCat = safe(m.getMembershipCategory());
+            if (!dbCat.isEmpty()) {
+                String uiCat = fromDbMembershipCategory(dbCat);
+                if ("Other Earning Groups".equals(uiCat)) {
+                    membershipCategoryBox.setSelectedItem("Other Earning Groups");
+                    if (!"OTHER EARNING GROUPS".equalsIgnoreCase(dbCat)) {
+                        membershipCategoryOtherEarningField.setText(dbCat);
+                    }
+                    membershipCategoryOtherEarningPanel.setVisible(true);
+                } else {
+                    membershipCategoryBox.setSelectedItem(uiCat);
+                }
             }
-            //membershipTypeOthersField.setText(safe(m.getMembershipTypeOthers()));
-            setCombo(membershipCategoryBox,  m.getMembershipCategory());
+
+            // Membership Category determines whether Current Employment's
+            // Country of Assignment / Type of Work are open to OFW-only options.
+            applyOfwGate();
+
             setCombo(occupationalStatusBox,  m.getOccupationalStatus());
             setCombo(frequencyBox,           m.getFrequencyOfMembershipSavings());
             crnField.setText(safe(m.getCrn()));
@@ -339,6 +374,8 @@ public class MemberRecordForm extends JFrame {
             totalIncomeField.setText(m.getTotalMoIncome() != null ? m.getTotalMoIncome().toPlainString() : "");
         } else {
             showError("No member record found for MID: " + loggedInMID);
+            // No membership data at all — make sure the OFW gate defaults closed.
+            applyOfwGate();
         }
 
         CurrentEmpRecordTable cur = new CurrentEmpDAO().getCurrentEmpByMID(loggedInMID);
@@ -346,8 +383,27 @@ public class MemberRecordForm extends JFrame {
             curOccupationField.setText(safe(cur.getOccupation()));
             curDateEmpField.setText(cur.getDateEmployed() != null ? cur.getDateEmployed().toString() : "");
             setCombo(curEmpStatusBox,  cur.getEmploymentStatus());
+
+            // ── Country of Assignment — matched against the gate-filtered list,
+            //    falling back to the free-text "Other" field if unrecognized ──
+            String savedCountry = cur.getCountryOfAssignment();
+            boolean knownCountry = false;
+            if (savedCountry != null) {
+                for (int i = 0; i < curCountryBox.getItemCount(); i++) {
+                    if (curCountryBox.getItemAt(i).equals(savedCountry)) {
+                        knownCountry = true; break;
+                    }
+                }
+            }
+            if (knownCountry) {
+                curCountryBox.setSelectedItem(savedCountry);
+            } else if (savedCountry != null && !savedCountry.isEmpty()) {
+                curCountryBox.setSelectedItem("Other");
+                curCountryOthersPanel.setVisible(true);
+                curCountryOthersField.setText(savedCountry);
+            }
+
             setCombo(curTypeOfWorkBox, cur.getTypeOfWork());
-            setCombo(curCountryBox,    cur.getCountryOfAssignment());
             String code = cur.getCompanyCode();
             for (int i = 0; i < curCompanyBox.getItemCount(); i++) {
                 if (curCompanyBox.getItemAt(i).contains("(" + code + ")")) {
@@ -393,12 +449,22 @@ public class MemberRecordForm extends JFrame {
 
         MemberTable m = new MemberTable();
         m.setPagIbigMIDNo(loggedInMID);
-        m.setMembershipType(toMembershipTypeEnum((String) membershipTypeBox.getSelectedItem()));
         String mType = "Others".equals(membershipTypeBox.getSelectedItem())
             ? membershipTypeOthersField.getText().trim()
             : toMembershipTypeEnum((String) membershipTypeBox.getSelectedItem());
         m.setMembershipType(mType);
-        m.setMembershipCategory(toMembershipCategoryEnum((String) membershipCategoryBox.getSelectedItem()));
+
+        // ── Membership Category: if "Other Earning Groups", optionally store custom text ──
+        String selectedCat = (String) membershipCategoryBox.getSelectedItem();
+        String membershipCatDb;
+        if ("Other Earning Groups".equals(selectedCat)) {
+            String custom = membershipCategoryOtherEarningField.getText().trim();
+            membershipCatDb = custom.isEmpty() ? "OTHER EARNING GROUPS" : custom.toUpperCase();
+        } else {
+            membershipCatDb = toMembershipCategoryEnum(selectedCat);
+        }
+        m.setMembershipCategory(membershipCatDb);
+
         m.setOccupationalStatus(toDbOccupational((String) occupationalStatusBox.getSelectedItem()));
         m.setFrequencyOfMembershipSavings((String) frequencyBox.getSelectedItem());
         m.setCrn(crnField.getText().trim());
@@ -445,6 +511,20 @@ public class MemberRecordForm extends JFrame {
             String sel = (String) curCompanyBox.getSelectedItem();
             String compCode = sel.substring(sel.lastIndexOf("(") + 1, sel.lastIndexOf(")"));
 
+            // ── Country of Assignment — resolve free-text "Other" value ────────
+            String curCountry = (String) curCountryBox.getSelectedItem();
+            if ("Other".equals(curCountry)) {
+                curCountry = curCountryOthersField.getText().trim();
+                if (curCountry.isEmpty()) { showError("Please specify the Country of Assignment."); return; }
+            }
+
+            // ── Type of Work is only meaningful (and required) for OFW members ──
+            boolean curIsOfw = "Overseas Filipino Worker".equals(membershipCategoryBox.getSelectedItem());
+            if (curIsOfw && "Select".equals(curTypeOfWorkBox.getSelectedItem())) {
+                showError("Please select a Type of Work for OFW assignments.");
+                return;
+            }
+
             String tow = "Select".equals(curTypeOfWorkBox.getSelectedItem()) ? null
                        : (String) curTypeOfWorkBox.getSelectedItem();
 
@@ -453,7 +533,7 @@ public class MemberRecordForm extends JFrame {
                 curOccupationField.getText().trim(),
                 (String) curEmpStatusBox.getSelectedItem(),
                 tow,
-                (String) curCountryBox.getSelectedItem(),
+                curCountry,
                 dateEmp);
 
             CurrentEmpDAO curDao = new CurrentEmpDAO();
@@ -506,6 +586,16 @@ public class MemberRecordForm extends JFrame {
             String dob  = entry.birthdateField.getText().trim();
             if (name.isEmpty() || "Select".equals(rel)) continue;
 
+            // ── Relationship: resolve free-text "Other" value ─────────────────
+            if ("Other".equals(rel)) {
+                String customRel = entry.relationshipOthersField.getText().trim();
+                if (customRel.isEmpty()) {
+                    showError("Heir " + (i + 1) + ": Please specify the relationship.");
+                    return;
+                }
+                rel = customRel;
+            }
+
             // ── Validate heir birthdate ───────────────────────────────────────
             Date birthDate = null;
             if (!dob.isEmpty()) {
@@ -549,21 +639,42 @@ public class MemberRecordForm extends JFrame {
         membershipTypeOthersPanel.setVisible(false);
         c.add(membershipTypeOthersPanel); c.add(vgap(8));
 
-        // Listener to show/hide
+        // Listener to show/hide + cascade the Membership Category filter
         membershipTypeBox.addActionListener(e -> {
             boolean show = "Others".equals(membershipTypeBox.getSelectedItem());
             membershipTypeOthersPanel.setVisible(show);
+            if (!show) membershipTypeOthersField.setText("");
+            filterMembershipCategoryOptions((String) membershipTypeBox.getSelectedItem());
             c.revalidate(); c.repaint();
         });
 
         JPanel r2 = row(2);
-        r2.add(lf("Membership Category", membershipCategoryBox = cb(new String[]{
-                "Select","Private","Government","Private Household",
-                "Overseas Filipino Worker","Professional/Business Owner",
-                "Job Order Personnel","Other Earning Groups","Others"})));
+        // Membership Category options are filtered based on Membership Type —
+        // start with just "Select" until a type cascades the real options in.
+        r2.add(lf("Membership Category", membershipCategoryBox = cb(new String[]{"Select"})));
+        membershipCategoryBox.setEnabled(false);
         r2.add(lf("Occupational Status", occupationalStatusBox = cb(new String[]{
                 "Select","Employed","Unemployed","First Time Jobseeker"})));
-        c.add(r2); c.add(vgap(16));
+        c.add(r2); c.add(vgap(8));
+
+        // "Other Earning Groups" panel for Membership Category — hidden by default
+        membershipCategoryOtherEarningField = tf("");
+        membershipCategoryOtherEarningPanel = new JPanel(new GridLayout(1, 1, 0, 0));
+        membershipCategoryOtherEarningPanel.setOpaque(false);
+        membershipCategoryOtherEarningPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+        membershipCategoryOtherEarningPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        membershipCategoryOtherEarningPanel.add(lf("Other Earning Groups — please specify", membershipCategoryOtherEarningField));
+        membershipCategoryOtherEarningPanel.setVisible(false);
+        c.add(membershipCategoryOtherEarningPanel); c.add(vgap(8));
+
+        // Listener to show/hide + re-evaluate the OFW gate on Current Employment
+        membershipCategoryBox.addActionListener(e -> {
+            boolean show = "Other Earning Groups".equals(membershipCategoryBox.getSelectedItem());
+            membershipCategoryOtherEarningPanel.setVisible(show);
+            if (!show) membershipCategoryOtherEarningField.setText("");
+            applyOfwGate();
+            c.revalidate(); c.repaint();
+        });
 
         JPanel r3 = row(2);
         r3.add(lf("Frequency of Membership Savings", frequencyBox = cb(new String[]{
@@ -671,10 +782,29 @@ public class MemberRecordForm extends JFrame {
                 "Select","PERMANENT/REGULAR","CASUAL","CONTRACTUAL","PROJECT BASED","PART-TIME/TEMPORARY"})));
         r17.add(lf("Type of Work", curTypeOfWorkBox = cb(new String[]{
                 "Select","LAND-BASED","SEA-BASED"})));
-        r17.add(lf("Country of Assignment", curCountryBox = cb(new String[]{
-                "Select","Philippines","Saudi Arabia","United Arab Emirates",
-                "Qatar","Kuwait","Singapore","Hong Kong","United States","Canada","Other"})));
-        c.add(r17); c.add(vgap(26));
+        r17.add(lf("Country of Assignment", curCountryBox = cb(COUNTRY_OPTIONS_ALL)));
+        c.add(r17); c.add(vgap(16));
+
+        // Country of Assignment "Other" specify panel — hidden by default
+        curCountryOthersField = tf("");
+        curCountryOthersPanel = new JPanel(new GridLayout(1, 1, 0, 0));
+        curCountryOthersPanel.setOpaque(false);
+        curCountryOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+        curCountryOthersPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        curCountryOthersPanel.add(lf("Country of Assignment — please specify", curCountryOthersField));
+        curCountryOthersPanel.setVisible(false);
+        c.add(curCountryOthersPanel); c.add(vgap(26));
+
+        curCountryBox.addActionListener(e -> {
+            boolean isOther = "Other".equals(curCountryBox.getSelectedItem());
+            curCountryOthersPanel.setVisible(isOther);
+            if (!isOther) curCountryOthersField.setText("");
+            c.revalidate(); c.repaint();
+        });
+
+        // Current Employment starts gated closed (non-OFW) until membership
+        // data is loaded / a membership category is chosen above.
+        applyOfwGate();
 
         c.add(sectionHeader("Previous Employment Records")); c.add(vgap(14));
         prevEmpListPanel = new JPanel();
@@ -699,6 +829,114 @@ public class MemberRecordForm extends JFrame {
         c.add(addHeirBtn);
 
         return c;
+    }
+
+    // =========================================================================
+    // MEMBERSHIP CATEGORY FILTER — cascades from Membership Type
+    // (ported from the Membership Information module)
+    // =========================================================================
+    private void filterMembershipCategoryOptions(String membershipType) {
+        String[] options;
+        boolean disableForOthers = false;
+
+        if (membershipType == null) membershipType = "";
+
+        switch (membershipType) {
+            case "Employed":
+                options = new String[]{"Select", "Private", "Government", "Private Household"};
+                break;
+            case "Overseas Filipino Worker":
+                options = new String[]{"Select", "Overseas Filipino Worker"};
+                break;
+            case "Self-Employed":
+                options = new String[]{"Select", "Professional/Business Owner",
+                        "Job Order Personnel", "Other Earning Groups"};
+                break;
+            case "Others":
+                options = new String[]{"Select"};
+                disableForOthers = true;
+                break;
+            default: // "Select" — no Membership Type chosen yet
+                options = new String[]{"Select"};
+                disableForOthers = true;
+        }
+
+        String previouslySelected = (String) membershipCategoryBox.getSelectedItem();
+        membershipCategoryBox.setModel(new javax.swing.DefaultComboBoxModel<>(options));
+
+        boolean restored = false;
+        if (previouslySelected != null) {
+            for (int i = 0; i < membershipCategoryBox.getItemCount(); i++) {
+                if (membershipCategoryBox.getItemAt(i).equals(previouslySelected)) {
+                    membershipCategoryBox.setSelectedIndex(i);
+                    restored = true;
+                    break;
+                }
+            }
+        }
+        if (!restored) membershipCategoryBox.setSelectedIndex(0);
+
+        membershipCategoryBox.setEnabled(!disableForOthers);
+
+        if (disableForOthers) {
+            membershipCategoryOtherEarningField.setText("");
+            membershipCategoryOtherEarningPanel.setVisible(false);
+            membershipCategoryOtherEarningPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 0));
+        }
+
+        // Membership Category drives the Current Employment OFW gate — re-check it
+        // every time the category list (and therefore the selection) changes.
+        applyOfwGate();
+    }
+
+    // =========================================================================
+    // CURRENT EMPLOYMENT — COUNTRY OF ASSIGNMENT / TYPE OF WORK OFW GATE
+    // (ported from the Current Employment module; driven by Membership Category
+    // on this same form instead of the registration session)
+    // =========================================================================
+    private void applyOfwGate() {
+        if (curCountryBox == null || curTypeOfWorkBox == null) return; // not built yet
+
+        boolean isOfw = "Overseas Filipino Worker".equals(membershipCategoryBox.getSelectedItem());
+        String tip = "Available only for OFW members. Set Membership Category to "
+                   + "\"Overseas Filipino Worker\" above to enable this.";
+
+        if (!isOfw) {
+            curCountryBox.setModel(new javax.swing.DefaultComboBoxModel<>(COUNTRY_OPTIONS_ALL));
+            curCountryBox.setSelectedItem("Philippines");
+            curCountryBox.setEnabled(false);
+            curCountryBox.setToolTipText(tip);
+            if (curCountryOthersPanel != null) {
+                curCountryOthersPanel.setVisible(false);
+                curCountryOthersField.setText("");
+            }
+
+            curTypeOfWorkBox.setSelectedItem("Select");
+            curTypeOfWorkBox.setEnabled(false);
+            curTypeOfWorkBox.setToolTipText(tip);
+        } else {
+            // OFW members are, by definition, assigned outside the Philippines —
+            // remove it from the choices instead of just locking the field.
+            String previouslySelected = (String) curCountryBox.getSelectedItem();
+            curCountryBox.setModel(new javax.swing.DefaultComboBoxModel<>(COUNTRY_OPTIONS_OFW));
+
+            boolean restored = false;
+            if (previouslySelected != null) {
+                for (int i = 0; i < curCountryBox.getItemCount(); i++) {
+                    if (curCountryBox.getItemAt(i).equals(previouslySelected)) {
+                        curCountryBox.setSelectedIndex(i);
+                        restored = true;
+                        break;
+                    }
+                }
+            }
+            if (!restored) curCountryBox.setSelectedIndex(0); // "Select"
+
+            curCountryBox.setEnabled(true);
+            curCountryBox.setToolTipText(null);
+            curTypeOfWorkBox.setEnabled(true);
+            curTypeOfWorkBox.setToolTipText(null);
+        }
     }
 
     // ── Dynamic prev emp entry ────────────────────────────────────────────────
@@ -741,7 +979,8 @@ public class MemberRecordForm extends JFrame {
         HeirEntryPanel entry = new HeirEntryPanel(name, rel, bdate);
         heirEntries.add(entry);
 
-        JPanel sub = buildSubCard(accentRed);
+        // Extra height to fit the "Relationship — please specify" row when shown.
+        JPanel sub = buildSubCard(accentRed, 300);
         JPanel subHdr = new JPanel(new BorderLayout()); subHdr.setOpaque(false);
         JLabel subLbl = new JLabel("Heir / Dependent " + heirCount);
         subLbl.setFont(new Font("Arial Black", Font.BOLD, 12));
@@ -762,7 +1001,10 @@ public class MemberRecordForm extends JFrame {
 
         JPanel r2 = row(1);
         r2.add(lf("BIRTHDATE (YYYY-MM-DD)", entry.birthdateField));
-        sub.add(r2);
+        sub.add(r2); sub.add(vgap(10));
+
+        // "Other" relationship specify field — hidden unless "Other" is selected
+        sub.add(entry.relationshipOthersPanel);
 
         heirListPanel.add(sub);
         heirListPanel.add(vgap(10));
@@ -797,6 +1039,8 @@ public class MemberRecordForm extends JFrame {
     private class HeirEntryPanel {
         JTextField    nameField, birthdateField;
         JComboBox<String> relationshipBox;
+        JTextField    relationshipOthersField;
+        JPanel        relationshipOthersPanel;
         HeirEntryPanel(String name, String rel, String bdate) {
             nameField      = tf(name);
             birthdateField = tfDate();
@@ -805,14 +1049,67 @@ public class MemberRecordForm extends JFrame {
             attachDateValidation(birthdateField, true, "Heir Birthdate");
             relationshipBox = cb(new String[]{
                 "Select","Spouse","Child","Parent","Sibling","Legal Heir","Other"});
+
+            // "Other" relationship — free-text specify field (hidden by default)
+            relationshipOthersField = tf("");
+            relationshipOthersPanel = new JPanel(new GridLayout(1, 1, 0, 0));
+            relationshipOthersPanel.setOpaque(false);
+            relationshipOthersPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+            relationshipOthersPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            relationshipOthersPanel.add(lf("Relationship — please specify", relationshipOthersField));
+            relationshipOthersPanel.setVisible(false);
+
+            boolean matched = false;
             if (rel != null && !rel.isEmpty()) {
                 for (int i = 0; i < relationshipBox.getItemCount(); i++) {
                     if (relationshipBox.getItemAt(i).equalsIgnoreCase(rel)) {
                         relationshipBox.setSelectedIndex(i);
+                        matched = true;
                         break;
                     }
                 }
+                if (!matched) {
+                    // Free-text relationship value coming from the database
+                    relationshipBox.setSelectedItem("Other");
+                    relationshipOthersField.setText(rel);
+                    relationshipOthersPanel.setVisible(true);
+                }
             }
+
+            relationshipBox.addActionListener(e -> {
+                boolean show = "Other".equals(relationshipBox.getSelectedItem());
+                relationshipOthersPanel.setVisible(show);
+                if (!show) relationshipOthersField.setText("");
+                heirListPanel.revalidate();
+                heirListPanel.repaint();
+            });
+        }
+    }
+
+    // =========================================================================
+    // REVERSE DB MAPPERS — used when loading saved data back into the combos
+    // =========================================================================
+    private String fromDbMembershipType(String db) {
+        if (db == null) return "Select";
+        switch (db) {
+            case "EMPLOYED":                 return "Employed";
+            case "OVERSEAS FILIPINO WORKER": return "Overseas Filipino Worker";
+            case "SELF-EMPLOYED":            return "Self-Employed";
+            default:                         return "Others"; // free-text value
+        }
+    }
+
+    private String fromDbMembershipCategory(String db) {
+        if (db == null) return "Select";
+        switch (db) {
+            case "PRIVATE":                     return "Private";
+            case "GOVERNMENT":                  return "Government";
+            case "PRIVATE HOUSEHOLD":           return "Private Household";
+            case "OVERSEAS FILIPINO WORKER":    return "Overseas Filipino Worker";
+            case "PROFESSIONAL/BUSINESS OWNER": return "Professional/Business Owner";
+            case "JOB ORDER PERSONNEL":         return "Job Order Personnel";
+            case "OTHER EARNING GROUPS":        return "Other Earning Groups";
+            default:                            return "Other Earning Groups"; // free-text
         }
     }
 
@@ -830,6 +1127,10 @@ public class MemberRecordForm extends JFrame {
     }
 
     private JPanel buildSubCard(Color borderColor) {
+        return buildSubCard(borderColor, 240);
+    }
+
+    private JPanel buildSubCard(Color borderColor, int maxHeight) {
         JPanel sub = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -846,7 +1147,7 @@ public class MemberRecordForm extends JFrame {
         sub.setLayout(new BoxLayout(sub, BoxLayout.Y_AXIS));
         sub.setBorder(new EmptyBorder(14, 16, 16, 16));
         sub.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sub.setMaximumSize(new Dimension(Integer.MAX_VALUE, 240));
+        sub.setMaximumSize(new Dimension(Integer.MAX_VALUE, maxHeight));
         return sub;
     }
 

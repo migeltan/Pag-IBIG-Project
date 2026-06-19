@@ -2,8 +2,10 @@ package ui.views;
 
 import dao.CompanyDAO;	
 import dao.CurrentEmpDAO;
+import dao.MemberDAO;
 import models.CompanyDetailsTable;
 import models.CurrentEmpRecordTable;
+import models.MemberTable;
 import ui.frames.SignInFrame;
 
 import javax.swing.*;
@@ -29,6 +31,16 @@ public class CurrentEmpFormView extends JPanel {
     private final Color accentAmber = new Color(251, 191, 36);
     private final Color accentRed   = new Color(255, 99, 132);
     private final Color textWhite   = Color.WHITE;
+
+    private static final String[] COUNTRY_OPTIONS_ALL = {
+            "Select", "Philippines", "Saudi Arabia", "United Arab Emirates",
+            "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
+    };
+    private static final String[] COUNTRY_OPTIONS_OFW = {
+            "Select", "Saudi Arabia", "United Arab Emirates",
+            "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
+    };
+
 
     private final String loggedInMID;
     private boolean editMode = false;
@@ -121,6 +133,8 @@ public class CurrentEmpFormView extends JPanel {
         JPanel r2 = row(2);
         r2.add(fieldPanel("OCCUPATION *",                 occupationField   = buildTextField()));
         r2.add(fieldPanel("DATE EMPLOYED (YYYY-MM-DD) *", dateEmployedField = buildTextField()));
+
+       boolean isOfw = isOfwMembershipCategory();
 
         // ── Auto-insert dashes + block non-digits ─────────────────────────────
         ((AbstractDocument) dateEmployedField.getDocument()).setDocumentFilter(new DocumentFilter() {
@@ -215,10 +229,8 @@ public class CurrentEmpFormView extends JPanel {
         r3.add(fieldPanel("TYPE OF WORK", typeOfWorkBox = buildComboBox(new String[]{
                 "Select", "LAND-BASED", "SEA-BASED"
         })));
-        r3.add(fieldPanel("COUNTRY OF ASSIGNMENT *", countryOfAssignmentBox = buildComboBox(new String[]{
-                "Select", "Philippines", "Saudi Arabia", "United Arab Emirates",
-                "Qatar", "Kuwait", "Singapore", "Hong Kong", "United States", "Canada", "Other"
-        })));
+        r3.add(fieldPanel("COUNTRY OF ASSIGNMENT *", countryOfAssignmentBox = buildComboBox(
+                isOfw ? COUNTRY_OPTIONS_OFW : COUNTRY_OPTIONS_ALL)));
 
         // ── Buttons ───────────────────────────────────────────────────────────
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 0));
@@ -267,8 +279,12 @@ public class CurrentEmpFormView extends JPanel {
         bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
-        if (loggedInMID != null && !loggedInMID.isEmpty()) {
+       if (loggedInMID != null && !loggedInMID.isEmpty()) {
             loadData();
+        }
+        if (!isOfw) {
+            setComboByValue(countryOfAssignmentBox, "Philippines");
+            setComboByValue(typeOfWorkBox, "Select");
         }
         lockFields();
     }
@@ -359,6 +375,13 @@ public class CurrentEmpFormView extends JPanel {
         return items;
     }
 
+    // ── OFW Gate — Type of Work & Country of Assignment only editable for OFW members ──
+    private boolean isOfwMembershipCategory() {
+        if (loggedInMID == null || loggedInMID.isEmpty()) return false;
+        MemberTable data = new MemberDAO().getMemberById(loggedInMID);
+        return data != null && "OVERSEAS FILIPINO WORKER".equalsIgnoreCase(data.getMembershipCategory());
+    }
+
     private void lockFields() {
         pagIbigMidNoField.setEditable(false); pagIbigMidNoField.setFocusable(false);
         occupationField.setEditable(false);   occupationField.setFocusable(false);
@@ -374,8 +397,24 @@ public class CurrentEmpFormView extends JPanel {
         dateEmployedField.setEditable(true); dateEmployedField.setFocusable(true);
         companyBox.setEnabled(true);
         employmentStatusBox.setEnabled(true);
-        typeOfWorkBox.setEnabled(true);
-        countryOfAssignmentBox.setEnabled(true);
+
+        boolean isOfw = isOfwMembershipCategory();
+        String tip = "Available only for OFW members. Update Membership Category to "
+                   + "\"Overseas Filipino Worker\" in Member Information to enable this.";
+
+        if (isOfw) {
+            typeOfWorkBox.setEnabled(true);
+            countryOfAssignmentBox.setEnabled(true);
+            typeOfWorkBox.setToolTipText(null);
+            countryOfAssignmentBox.setToolTipText(null);
+        } else {
+            setComboByValue(countryOfAssignmentBox, "Philippines");
+            setComboByValue(typeOfWorkBox, "Select");
+            typeOfWorkBox.setEnabled(false);
+            countryOfAssignmentBox.setEnabled(false);
+            typeOfWorkBox.setToolTipText(tip);
+            countryOfAssignmentBox.setToolTipText(tip);
+        }
     }
 
     private void setComboByValue(JComboBox<String> box, String value) {
