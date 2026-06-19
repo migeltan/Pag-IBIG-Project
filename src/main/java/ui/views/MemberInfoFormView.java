@@ -185,13 +185,15 @@ public class MemberInfoFormView extends JPanel {
         bg.add(cardWrap, BorderLayout.CENTER);
         add(bg, BorderLayout.CENTER);
 
-        if (loggedInMID != null && !loggedInMID.isEmpty()) {
+       if (loggedInMID != null && !loggedInMID.isEmpty()) {
             loadMemberData(loggedInMID);
         } else {
             loadDummyData();
         }
         lockAllFields();
+        filterMembershipCategoryOptions((String) membershipTypeBox.getSelectedItem());
     }
+    
 
     // =========================================================================
     // Custom scroll pane — glass-style, thin accent-green thumb
@@ -427,6 +429,7 @@ public class MemberInfoFormView extends JPanel {
         for (JComboBox<?> b : allCombos())   { b.setEnabled(true); }
         pagIbigMidNoField.setEditable(false);
         totalMoIncomeField.setEditable(false);
+        filterMembershipCategoryOptions((String) membershipTypeBox.getSelectedItem());
     }
 
     private JTextField[] allTextFields() {
@@ -498,9 +501,10 @@ public class MemberInfoFormView extends JPanel {
         r3.add(lf("CRN", crnField = tf()));
         c.add(r3); c.add(vgap(24));
 
-        membershipTypeBox.addActionListener(e -> {
+       membershipTypeBox.addActionListener(e -> {
             boolean show = "Others".equals(membershipTypeBox.getSelectedItem());
             membershipTypeOthersPanel.setVisible(show);
+            filterMembershipCategoryOptions((String) membershipTypeBox.getSelectedItem());
             c.revalidate(); c.repaint();
         });
         membershipCategoryBox.addActionListener(e -> {
@@ -601,6 +605,58 @@ public class MemberInfoFormView extends JPanel {
         }
         box.addItem(value);
         box.setSelectedItem(value);
+    }
+
+    private void filterMembershipCategoryOptions(String membershipType) {
+        String[] options;
+        boolean disableForOthers = false;
+
+        if (membershipType == null) membershipType = "";
+
+        switch (membershipType) {
+            case "EMPLOYED":
+                options = new String[]{"Select", "PRIVATE", "GOVERNMENT", "PRIVATE HOUSEHOLD"};
+                break;
+            case "OVERSEAS FILIPINO WORKER":
+                options = new String[]{"Select", "OVERSEAS FILIPINO WORKER"};
+                break;
+            case "SELF-EMPLOYED":
+                options = new String[]{"Select", "PROFESSIONAL/BUSINESS OWNER",
+                        "JOB ORDER PERSONNEL", "OTHER EARNING GROUPS"};
+                break;
+            case "Others":
+                options = new String[]{"Select"};
+                disableForOthers = true;
+                break;
+            default: // "Select" or unrecognized value — no Membership Type chosen yet,
+                      // so freeze Membership Category until one is picked
+                options = new String[]{"Select"};
+                disableForOthers = true;
+        }
+
+        String previouslySelected = (String) membershipCategoryBox.getSelectedItem();
+
+        membershipCategoryBox.setModel(new javax.swing.DefaultComboBoxModel<>(options));
+
+        boolean restored = false;
+        if (previouslySelected != null) {
+            for (int i = 0; i < membershipCategoryBox.getItemCount(); i++) {
+                if (membershipCategoryBox.getItemAt(i).equals(previouslySelected)) {
+                    membershipCategoryBox.setSelectedIndex(i);
+                    restored = true;
+                    break;
+                }
+            }
+        }
+        if (!restored) membershipCategoryBox.setSelectedIndex(0);
+
+        boolean baseEnabled = membershipTypeBox.isEnabled();
+        membershipCategoryBox.setEnabled(baseEnabled && !disableForOthers);
+
+        if (disableForOthers) {
+            membershipCategoryOthersField.setText("");
+            membershipCategoryOthersPanel.setVisible(false);
+        }
     }
 
     private String safe(String s) { return s != null ? s : ""; }
