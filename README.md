@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-This system is developed using Java and MySQL, fulfilling the requirements for OOP and Information Management courses.
+This system is developed using Java and MySQL, fulfilling the requirements for OOP course.
 
 It allows users to perform basic system transactions such as:
 
@@ -22,6 +22,8 @@ Across the following membership form modules:
 - Previous Employment Record
 - Heirs / Dependents
 - Company Details
+- Admin Dashboard
+- Report Generation
 
 The project demonstrates the use of:
 
@@ -34,6 +36,7 @@ The project demonstrates the use of:
 - Exception Handling
 - Database Connectivity (JDBC)
 
+
 ---
 
 ## Technologies Used
@@ -43,8 +46,7 @@ The project demonstrates the use of:
 | Java 8             | Main Programming Language  |
 | Java Swing         | GUI / Desktop Interface    |
 | MySQL 9.7          | Database                   |
-| JDBC               | Java Database Connectivity |
-| Eclipse / IntelliJ | IDE                        |
+| Eclipse / VSCode   | IDE                        |
 | GitHub             | Version Control            |
 
 ---
@@ -55,34 +57,63 @@ The project demonstrates the use of:
 Pag-CONNECT-Project/
 └── src/main/java/
     ├── main/
-    │   └── Pagibig1.java                   ← Entry point, launches the app
+    │   ├── Pagibig.java                    ← Entry point
+    │   └── RegistrationSession.java        ← In-memory session holder for signup flow
     ├── ui/
-    │   ├── LoginPanel.java                 ← Login screen
-    │   ├── DashboardFrame.java             ← Module selection dashboard
-    │   ├── MemberInfoForm.java             ← Member personal details form
-    │   ├── CurrentEmpForm.java             ← Current employment form
-    │   ├── PrevEmpForm.java                ← Previous employment form
-    │   └── HeirsForm.java                  ← Heirs / dependents form
+    │   ├── assets/                         ← Image assets (logos, icons)
+    │   │   ├── currentEmp.png
+    │   │   ├── heirs.png
+    │   │   ├── logo.png
+    │   │   ├── memberinfo.png
+    │   │   └── prevEmp.png
+    │   ├── forms/                          ← Signup module forms
+    │   │   ├── CurrentEmpForm.java
+    │   │   ├── HeirsForm.java
+    │   │   ├── MemberInfoForm.java
+    │   │   ├── MemberRecordForm.java       ← Combined edit form (member dashboard)
+    │   │   └── PrevEmpForm.java
+    │   ├── frames/                         ← Top-level windows
+    │   │   ├── AdminDashboard.java         ← Admin CRUD management panel
+    │   │   ├── AdminLoginFrame.java        ← Admin login screen
+    │   │   ├── LoginFrame.java             ← Member login screen (Run this first for the whole flow)
+    │   │   ├── SignInFrame.java            ← Member dashboard / main menu
+    │   │   └── SignUpFrame.java            ← Registration module selector
+    │   ├── utils/                          ← Shared utility frames
+    │   │   ├── FontShowcase.java
+    │   │   ├── NewPassword.java
+    │   │   └── SetUpPassword.java          ← Password + security question setup
+    │   └── views/                          ← Read-only / editable record views
+    │       ├── CurrentEmpFormView.java
+    │       ├── HeirsFormView.java
+    │       ├── MemberInfoFormView.java
+    │       └── PrevEmpFormView.java
     └── database/
         ├── dao/
-        │   ├── MemberDAO.java              ← CRUD for membertable
-        │   ├── CompanyDAO.java             ← CRUD for companydetailstable
-        │   ├── CurrentEmpDAO.java          ← CRUD for currentemprecordtable
-        │   ├── HeirsDAO.java               ← CRUD for heirstable
-        │   └── PrevEmpDAO.java             ← CRUD for prevemptable
+        │   ├── AdminDAO.java                ← Auth for admincredentials
+        │   ├── CompanyDAO.java              ← CRUD for companydetailstable
+        │   ├── CurrentEmpDAO.java           ← CRUD for currentemprecordtable
+        │   ├── HeirsDAO.java                ← CRUD for heirstable
+        │   ├── MemberDAO.java               ← CRUD for membertable
+        │   ├── PrevEmpDAO.java              ← CRUD for prevemptable
+        │   └── UserCredentialsDAO.java      ← Auth for usercredentials
         ├── database/
-        │   └── DatabaseConnection.java     ← MySQL connection manager
+        │   ├── DatabaseConnection.java      ← MySQL connection manager
+        │   └── dumpSeedRunThis.sql          ← Seed data script (Run this first before all the migration files)
         ├── models/
-        │   ├── MemberTable.java
         │   ├── CompanyDetailsTable.java
         │   ├── CurrentEmpRecordTable.java
         │   ├── HeirsTable.java
-        │   └── PrevEmpTable.java
+        │   ├── MemberTable.java
+        │   ├── PrevEmpTable.java
+        │   └── UserCredentials.java
         └── migrations/
-            ├── 001_add_record.sql
-            ├── 002_add_record.sql
-            ├── 003_add_record.sql
-            └── 004_add_record.sql
+            ├── V001__001to013.sql           ← Run this first then sequentially, last will be the completion tracking logic
+            ├── V014_add20_records.sql
+            ├── V015_add10_records.sql
+            ├── V016_add30_records.sql
+            ├── V017_alteration.sql
+            ├── V018_admin.sql
+            └── Completion tracking logic.sql
 ```
 
 ---
@@ -91,18 +122,29 @@ Pag-CONNECT-Project/
 
 ---
 
-### 🖥️ Frontend / UI — `ui/`
+### Frontend / UI — `ui/`
 
-**Assigned to: Raven Rayo, James Patrick Isidro**
 
-Contains all GUI screens built with Java Swing. Each file represents one screen or form that the user interacts with. The UI layer never accesses the database directly — it always calls a DAO method to perform any data operation.
+Contains all GUI screens built with Java Swing, split into four subpackages. The UI layer never accesses the database directly — it always calls a DAO method to perform any data operation.
 
-| File                  | Description                              |
-| --------------------- | ---------------------------------------- |
-| `LoginPanel.java`     | Login screen shown on startup            |
-| `DashboardFrame.java` | Main menu displaying all form modules    |
-| `MemberInfoForm`      | Details about the membership application |
-| `...Form`             | Stated in documents                      |
+| Subpackage | Description |
+| ---------- | ------------ |
+| `ui/frames/` | Top-level windows — login, signup, member dashboard, admin dashboard |
+| `ui/forms/` | Signup module forms (Member Info, Employment, Heirs) and the combined member edit form |
+| `ui/views/` | Read-only / editable record views shown after login |
+| `ui/utils/` | Shared utility frames such as password setup |
+| `ui/assets/` | Image assets used across the UI |
+
+| File                       | Description                                       |
+| --------------------------- | -------------------------------------------------- |
+| `LoginFrame.java`          | Member login screen shown on startup               |
+| `SignInFrame.java`         | Member dashboard / main menu after login           |
+| `SignUpFrame.java`         | Registration module selector                       |
+| `AdminLoginFrame.java`     | Admin login screen                                  |
+| `AdminDashboard.java`      | Admin CRUD management panel with search/filter      |
+| `MemberInfoForm.java`      | Member personal details form (signup)               |
+| `MemberRecordForm.java`    | Combined edit form accessible from member dashboard |
+| `...Form.java` / `...View.java` | Remaining modules follow the same Form/View split documented in the source code section |
 
 ---
 
@@ -126,13 +168,15 @@ Models (`database/models/`) serve as data containers passed between the UI and D
 
 The system uses the `pagibig` MySQL database with the following tables:
 
-| Table                   | Description                                  |
-| ----------------------- | -------------------------------------------- |
-| `membertable`           | Core member personal and contact information |
-| `companydetailstable`   | Company records linked to members            |
-| `currentemprecordtable` | Each member's current employment details     |
-| `prevemptable`          | Previous employment history per member       |
-| `heirstable`            | Heirs and dependents per member              |
+| Table                    | Description                                   |
+| -------------------------- | ---------------------------------------------- |
+| `membertable`             | Core member personal and contact information |
+| `companydetailstable`     | Company records linked to members             |
+| `currentemprecordtable`   | Each member's current employment details      |
+| `prevemptable`            | Previous employment history per member        |
+| `heirstable`              | Heirs and dependents per member               |
+| `usercredentials`         | Member MID, password, and security questions  |
+| `admincredentials`        | Admin login credentials                       |
 
 ---
 
@@ -160,15 +204,22 @@ java -version
 - Download [MySQL Community Server](https://dev.mysql.com/downloads/mysql/)
 - Download [MySQL Workbench](https://dev.mysql.com/downloads/workbench/) for GUI management
 
-### 4. JDBC Driver
-
-- Download [MySQL Connector/J](https://dev.mysql.com/downloads/connector/j/)
-- Add the `.jar` file to your project's build path in Eclipse/IntelliJ
-- No need for this since it's already configured in the pom.xml, and Eclipse has its respective libraries already.
-
-### 5. GitHub
+### 4. GitHub
 
 - Set up Git inside your IDE or install [Git](https://git-scm.com/downloads) separately
+
+---
+
+## Importing the Project into Eclipse
+
+1. Copy the repository URL from GitHub (green **Code** button → HTTPS link).
+2. Open Eclipse → **File → Import...**
+3. Select **Git → Projects from Git** → click **Next**.
+4. Choose **Clone URI** → paste the copied repo link → click **Next**.
+5. Select the branch (usually `main`) → click **Next** → choose a local destination folder → **Next**.
+6. When prompted to import, select **Import as general project** (or **Existing Maven Projects** if a `pom.xml` is detected) → **Finish**.
+7. Once imported, right-click the project → **Configure → Convert to Maven Project** (if not already converted) to ensure dependencies resolve correctly.
+8. Wait for Eclipse to finish building the workspace, then proceed to the Database Setup section below.
 
 ---
 
