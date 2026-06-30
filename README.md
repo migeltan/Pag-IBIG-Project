@@ -300,4 +300,4 @@ git commit -m "Added member CRUD functionality"
 
 ## License
 
-Academic use only. Developed as a course requirement for OOP and Information Management.
+Academic use only. Developed as a course requirement for COMP 009 Object-Oriented Programming.
